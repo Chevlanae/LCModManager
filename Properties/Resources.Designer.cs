@@ -79,5 +79,15 @@ namespace LCModManager.Properties {
                 return ((byte[])(obj));
             }
         }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
+        internal static byte[] Refresh_Icon {
+            get {
+                object obj = ResourceManager.GetObject("Refresh_Icon", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
     }
 }

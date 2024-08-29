@@ -9,10 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="LCModManager.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Remove="20231007_183420.jpg" />
     <None Remove="Resources\Green_Plus.png" />
   </ItemGroup>

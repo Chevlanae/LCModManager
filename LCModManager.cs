@@ -1,51 +1,54 @@
-﻿using System.IO;
+﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace LCModManager
 {
-    internal class LCModManager
+    static internal class AppConfig
     {
+        static public string ResourcePath = Environment.GetEnvironmentVariable("APPDATA") + "\\LCModManager";
+        static public string PackageStorePath = ResourcePath + "\\mods";
+    }
 
-        static public string gameDir = FindGameDir();
-        static public string workingDirectory = Directory.GetCurrentDirectory();
+    static internal class GameDirectory
+    {
+        static public string substring = "steamapps\\common\\Lethal Company";
+        static public string? path = GameDirectory.Find();
 
-
-        static string? FindGameDir()
+        static public string? Find()
         {
             DriveInfo[] drives = DriveInfo.GetDrives();
-            List<string> possiblePaths = new List<string>(); ;
-            string gameDirSubstring = "steamapps\\common\\Lethal Company";
-            string ProgramFilesx86 = Path.Combine("C:\\Program Files (x86)\\Steam\\", gameDirSubstring);
-            string ProgramFiles = Path.Combine("C:\\Program Files\\Steam\\", gameDirSubstring);
 
-            foreach (var item in drives)
-            {
-                if (!item.Name.Contains('C'))
-                {
-                    possiblePaths.Add(Path.Combine(item.Name, "SteamLibrary\\", gameDirSubstring));
-                }
-            }
+            List<string?> possiblePaths = [];
 
-            possiblePaths.Add(ProgramFilesx86);
-            possiblePaths.Add(ProgramFiles);
+            foreach (var item in drives) if (!item.Name.Contains('C')) possiblePaths.Add(Path.Combine(item.Name, "SteamLibrary\\", substring));
 
-            foreach (var item in possiblePaths)
-            {
-                if (Directory.Exists(item))
-                {
-                    return item;
-                }
-            }
+            possiblePaths.Add(Path.Combine("C:\\Program Files (x86)\\Steam\\", substring));
+            possiblePaths.Add(Path.Combine("C:\\Program Files\\Steam\\", substring));
+
+            foreach (var item in possiblePaths) if (Directory.Exists(item)) return item;
 
             return null;
         }
+    }
 
-        static void CopyDirectory(string sourceDir, string destinationDir)
+
+    internal class Utils
+    {
+        static void CopyDirectory(string sourceDir, string destinationDir, bool recursive)
         {
             // Get information about the source directory
             var dir = new DirectoryInfo(sourceDir);
 
             // Check if the source directory exists
             if (!dir.Exists) return;
+
+            // Cache directories before copying
+            DirectoryInfo[] dirs = dir.GetDirectories();
 
             // Create the destination directory
             if (!Directory.Exists(destinationDir)) Directory.CreateDirectory(destinationDir);
@@ -57,60 +60,16 @@ namespace LCModManager
 
                 if (!File.Exists(targetFilePath)) file.CopyTo(targetFilePath);
             }
-        }
-
-        static void CopyDirectory(string sourceDir, string destinationDir, bool force)
-        {
-            if (force)
-            {
-                // Get information about the source directory
-                var dir = new DirectoryInfo(sourceDir);
-
-                // Check if the source directory exists
-                if (!dir.Exists) return;
-
-                // Delete destination directory if it already exists
-                if (Directory.Exists(destinationDir)) Directory.Delete(destinationDir, force);
-
-                // Create new directory
-                Directory.CreateDirectory(destinationDir);
-
-                // Get the files in the source directory and copy to the destination directory
-                foreach (FileInfo file in dir.GetFiles())
-                {
-                    string targetFilePath = Path.Combine(destinationDir, file.Name);
-
-                    if (File.Exists(targetFilePath)) File.Delete(targetFilePath);
-
-                    file.CopyTo(targetFilePath);
-                }
-            }
-            else
-            {
-                CopyDirectory(sourceDir, destinationDir);
-            }
-        }
-
-        static void CopyDirectory(string sourceDir, string destinationDir, bool force, bool recursive)
-        {
-            CopyDirectory(sourceDir, destinationDir, force);
 
             // If recursive and copying subdirectories, recursively call this method
             if (recursive)
             {
-                // Get information about the source directory
-                var dir = new DirectoryInfo(sourceDir);
-
-                // Cache directories before copying
-                DirectoryInfo[] dirs = dir.GetDirectories();
-
                 foreach (DirectoryInfo subDir in dirs)
                 {
                     string newDestinationDir = Path.Combine(destinationDir, subDir.Name);
-                    CopyDirectory(subDir.FullName, newDestinationDir, force);
+                    CopyDirectory(subDir.FullName, newDestinationDir, true);
                 }
             }
         }
     }
 }
-

@@ -7,23 +7,38 @@
       mc:Ignorable="d" 
       d:DesignHeight="450" d:DesignWidth="800"
       Title="ManageModsPage">
-
-    <Grid x:Name="MainGrid" Width="{Binding ActualWidth, ElementName=page, Mode=OneWay}" >
-        <ToolBar ToolBarTray.IsLocked="True" VerticalAlignment="Top" Height="25" FontSize="12" Width="{Binding ActualWidth, ElementName=MainGrid, Mode=OneWay}" Grid.ColumnSpan="2">
-            <Button HorizontalAlignment="Left" VerticalAlignment="Top" Height="20" Width="20" Margin="1">
+    <Grid x:Name="MainGrid" >
+        <ToolBar ToolBarTray.IsLocked="True" VerticalAlignment="Top" Height="40" FontSize="12" Width="{Binding ActualWidth, ElementName=MainGrid, Mode=OneWay}" Grid.ColumnSpan="2">
+            <Button x:Name="AddMod" Click="AddMod_Click" HorizontalAlignment="Left" VerticalAlignment="Top" Height="30" Width="30" Margin="3" RenderTransformOrigin="0.502,0.5">
                 <Image Height="12" Width="12" Source="/Resources/Green_Plus.png" ></Image>
             </Button>
-
-
+            <Button x:Name="RefreshList" Click="RefreshList_Click" HorizontalAlignment="Left" VerticalAlignment="Top" Height="30" Width="30" Margin="3" RenderTransformOrigin="0.502,0.5">
+                <Image Height="25" Width="25" Source="/Resources/Refresh_Icon.png" ></Image>
+            </Button>
         </ToolBar>
-        <ListView d:ItemsSource="{d:SampleData ItemCount=5}" Margin="0,25,0,0">
+        <ListView x:Name="ModList" Margin="0,40,0,0">
             <ListView.View>
-                <GridView>
-                    <GridViewColumn/>
+                <GridView AllowsColumnReorder="True">
+                    <GridViewColumn Header="Selection">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate DataType="CheckBox">
+                                <CheckBox></CheckBox>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn Header="Icon" DisplayMemberBinding="{Binding Path=Icon}">
+                        <GridViewColumn.CellTemplate>
+                            <DataTemplate DataType="BitmapImage">
+                                <Image Source="{Binding Path=Icon}" />
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                    <GridViewColumn DisplayMemberBinding="{Binding Path=Name}" Header="Name"/>
+                    <GridViewColumn DisplayMemberBinding="{Binding Path=Version}" Header="Version"/>
+                    <GridViewColumn DisplayMemberBinding="{Binding Path=Description}" Header="Description"/>
                 </GridView>
             </ListView.View>
         </ListView>
-
 
 
     </Grid>
