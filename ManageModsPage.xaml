@@ -12,34 +12,17 @@
             <Button x:Name="AddMod" Click="AddMod_Click" HorizontalAlignment="Left" VerticalAlignment="Top" Height="30" Width="30" Margin="3" RenderTransformOrigin="0.502,0.5">
                 <Image Height="12" Width="12" Source="/Resources/Green_Plus.png" ></Image>
             </Button>
-            <Button x:Name="RefreshList" Click="RefreshList_Click" HorizontalAlignment="Left" VerticalAlignment="Top" Height="30" Width="30" Margin="3" RenderTransformOrigin="0.502,0.5">
-                <Image Height="25" Width="25" Source="/Resources/Refresh_Icon.png" ></Image>
-            </Button>
         </ToolBar>
-        <ListView x:Name="ModList" Margin="0,40,0,0">
-            <ListView.View>
-                <GridView AllowsColumnReorder="True">
-                    <GridViewColumn Header="Selection">
-                        <GridViewColumn.CellTemplate>
-                            <DataTemplate DataType="CheckBox">
-                                <CheckBox></CheckBox>
-                            </DataTemplate>
-                        </GridViewColumn.CellTemplate>
-                    </GridViewColumn>
-                    <GridViewColumn Header="Icon" DisplayMemberBinding="{Binding Path=Icon}">
-                        <GridViewColumn.CellTemplate>
-                            <DataTemplate DataType="BitmapImage">
-                                <Image Source="{Binding Path=Icon}" />
-                            </DataTemplate>
-                        </GridViewColumn.CellTemplate>
-                    </GridViewColumn>
-                    <GridViewColumn DisplayMemberBinding="{Binding Path=Name}" Header="Name"/>
-                    <GridViewColumn DisplayMemberBinding="{Binding Path=Version}" Header="Version"/>
-                    <GridViewColumn DisplayMemberBinding="{Binding Path=Description}" Header="Description"/>
-                </GridView>
-            </ListView.View>
-        </ListView>
-
-
+        <DataGrid x:Name="ModListControl" Margin="0,40,0,0">
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="Icon">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate DataType="Image">
+                            <Image Height="64" Width="64" Source="{Binding Path=Icon}"  />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
     </Grid>
 </Page>
