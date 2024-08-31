@@ -8,20 +8,80 @@
       d:DesignHeight="450" d:DesignWidth="800"
       Title="ManageModsPage">
     <Grid x:Name="MainGrid" >
-        <ToolBar ToolBarTray.IsLocked="True" VerticalAlignment="Top" Height="40" FontSize="12" Width="{Binding ActualWidth, ElementName=MainGrid, Mode=OneWay}" Grid.ColumnSpan="2">
-            <Button x:Name="AddMod" Click="AddMod_Click" HorizontalAlignment="Left" VerticalAlignment="Top" Height="30" Width="30" Margin="3" RenderTransformOrigin="0.502,0.5">
+        <ToolBar ToolBarTray.IsLocked="True" VerticalAlignment="Top" Height="40" FontSize="12" Grid.ColumnSpan="2">
+            <Button x:Name="AddPackage" Click="AddPackage_Click" HorizontalAlignment="Left" VerticalAlignment="Center" Height="30" Width="30" Margin="3" RenderTransformOrigin="0.502,0.5">
                 <Image Height="12" Width="12" Source="/Resources/Green_Plus.png" ></Image>
             </Button>
+            <Button x:Name="RemovePackage" Click="RemovePackage_Click" HorizontalAlignment="Left" VerticalAlignment="Center" Height="30" Width="30" Margin="3" RenderTransformOrigin="0.502,0.5">
+                <Image Height="13" Width="13" Source="/Resources/RedXIcon.png" ></Image>
+            </Button>
         </ToolBar>
-        <DataGrid x:Name="ModListControl" Margin="0,40,0,0">
+        <DataGrid x:Name="ModListControl" GridLinesVisibility="Horizontal" Margin="0,40,0,0"  AutoGenerateColumns="False" CanUserResizeColumns="False" CanUserReorderColumns="False" CanUserResizeRows="False" CanUserDeleteRows="False" CanUserAddRows="False" IsReadOnly="True">
+            <DataGrid.Resources>
+                <ResourceDictionary>
+                    <Style x:Key="{x:Type DataGridCell}" TargetType="{x:Type DataGridCell}">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="BorderBrush" Value="Transparent" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                    <Style TargetType="{x:Type DataGridRow}">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="BorderBrush" Value="Transparent" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="LightBlue" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                    <Style x:Key="TextBlockStyle" TargetType="TextBlock" >
+                        <Setter Property="Padding" Value="10" />
+                        <Setter Property="HorizontalAlignment" Value="Left" />
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                        <Setter Property="TextWrapping" Value="Wrap" />
+                    </Style>
+                </ResourceDictionary>
+            </DataGrid.Resources>
             <DataGrid.Columns>
                 <DataGridTemplateColumn Header="Icon">
                     <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate DataType="Image">
-                            <Image Height="64" Width="64" Source="{Binding Path=Icon}"  />
+                        <DataTemplate>
+                            <Image Height="64" Width="64" Source="{Binding Path=Icon}" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Name}">
+                    <DataGridTextColumn.Header>
+                        <TextBlock Text="Name" />
+                    </DataGridTextColumn.Header>
+                </DataGridTextColumn>
+                <DataGridTextColumn MaxWidth="300" ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Description}">
+                    <DataGridTextColumn.Header>
+                        <TextBlock Text="Description" />
+                    </DataGridTextColumn.Header>
+                </DataGridTextColumn>
+                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Version}">
+                    <DataGridTextColumn.Header>
+                        <TextBlock Text="Version" />
+                    </DataGridTextColumn.Header>
+                </DataGridTextColumn>
+                <DataGridHyperlinkColumn Header="Website" Binding="{Binding Path=Website}">
+                    <DataGridHyperlinkColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Padding" Value="10" />
+                            <Setter Property="HorizontalAlignment" Value="Left" />
+                            <Setter Property="VerticalAlignment" Value="Center" />
+                            <EventSetter Event="Hyperlink.RequestNavigate" Handler="Hyperlink_RequestNavigate" />
+                        </Style>
+                    </DataGridHyperlinkColumn.ElementStyle>
+                </DataGridHyperlinkColumn>
             </DataGrid.Columns>
         </DataGrid>
     </Grid>

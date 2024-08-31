@@ -11,11 +11,13 @@
   <ItemGroup>
     <None Remove="20231007_183420.jpg" />
     <None Remove="Resources\Green_Plus.png" />
+    <None Remove="Resources\RedXIcon.png" />
   </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Resources\20231007_183420.jpg" />
     <Resource Include="Resources\Green_Plus.png" />
+    <Resource Include="Resources\RedXIcon.png" />
   </ItemGroup>
 
   <ItemGroup>

@@ -21,52 +21,6 @@ using System.Windows.Shapes;
 
 namespace LCModManager
 {
-
-    public interface IModEntry
-    {
-        public string? Name { get; }
-        public string? Description { get; }
-        public string? Version { get; }
-        public string? Website { get; }
-        public BitmapImage? Icon { get; }
-        public string[]? Dependencies { get; }
-    }
-
-    public class ModEntry : IModEntry
-    {
-        private string? _Name;
-        private string? _Description;
-        private string? _Version;
-        private string? _Website;
-        private BitmapImage? _Icon;
-        private string[]? _Dependencies;
-
-        public string? Name
-        {
-            get { return _Name; }
-        }
-        public string? Description
-        {
-            get { return _Description; }
-        }
-        public string? Version
-        {
-            get { return _Version; }
-        }
-        public string? Website
-        {
-            get { return _Website; }
-        }
-        public BitmapImage? Icon
-        {
-            get { return _Icon; }
-        }
-        public string[]? Dependencies
-        {
-            get { return _Dependencies; }
-        }
-    }
-
     /// <summary>
     /// Interaction logic for ManageModsPage.xaml
     /// </summary>
@@ -96,7 +50,7 @@ namespace LCModManager
             RefreshList_Click(true);
         }
 
-        private void AddMod_Click(object sender, RoutedEventArgs e)
+        private void AddPackage_Click(object sender, RoutedEventArgs e)
         {
             // Create OpenFileDialog 
             Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog
@@ -104,7 +58,8 @@ namespace LCModManager
                 // Set filter for file extension and default file extension 
                 DefaultExt = ".zip",
                 Filter = "ZIP Files (*.zip)|*.zip",
-                Multiselect = true
+                Multiselect = true,
+                
             };
 
             // Display OpenFileDialog by calling ShowDialog method 
@@ -118,7 +73,7 @@ namespace LCModManager
                     thunderStorePkgMgr.AddPackage(filename);
                 }
 
-                RefreshList_Click(true);
+                RefreshList_Click();
             }
         }
 
@@ -148,9 +103,34 @@ namespace LCModManager
             RefreshList_Click();
         }
 
-        private void ModList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void RemovePackage_Click(object sender, RoutedEventArgs e)
         {
+            List<ModPackage> items = [];
 
+            foreach(ModPackage entry in ModListControl.SelectedItems)
+            {
+                items.Add(entry);
+            }
+
+            foreach (ModPackage package in items)
+            {
+                ModList.Remove(package);
+                thunderStorePkgMgr.RemovePackage(package);
+            }
+
+            RefreshList_Click();
+        }
+
+        private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+        {
+            ProcessStartInfo info = new()
+            {
+                FileName = "explorer.exe",
+                Arguments = e.Uri.ToString(),
+            };
+
+            Process.Start(info);
+            e.Handled = true;
         }
     }
 }

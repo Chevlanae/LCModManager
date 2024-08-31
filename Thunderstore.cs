@@ -55,54 +55,15 @@ namespace LCModManager
             private BitmapImage? _Icon;
             private ModManifest? _Manifest;
 
-            public string? Path
-            {
-                get { return _Path; }
-            }
-            
-            public string? ReadMe
-            {
-                get { return _ReadMe; }
-            }
-
-            public string? ChangeLog
-            {
-                get { return _ChangeLog; } 
-            }
-
-            new public string? Name
-            {
-                get { return _Manifest?.Name; }
-            }
-
-            new public string? Version
-            {
-
-                get { return _Manifest?.Version_Number; }
-            }
-
-            new public string? Website
-            {
-
-                get { return _Manifest?.Website_Url; }
-            }
-
-            new public string? Description
-            {
-
-                get { return _Manifest?.Description; }
-            }
-
-            new public string[]? Dependencies
-            {
-
-                get { return _Manifest?.Dependencies; }
-            }
-
-            new public BitmapImage? Icon
-            {
-                get { return _Icon; }
-            }
+            public string? Path => _Path;
+            public string? ReadMe => _ReadMe;
+            public string? ChangeLog => _ChangeLog;
+            new public string? Name => _Manifest?.Name;
+            new public string? Version => _Manifest?.Version_Number;
+            new public string? Website => _Manifest?.Website_Url;
+            new public string? Description => _Manifest?.Description;
+            new public string[]? Dependencies => _Manifest?.Dependencies;
+            new public BitmapImage? Icon => _Icon;
 
             public ModPackage(string sourcePath)
             {
@@ -167,13 +128,15 @@ namespace LCModManager
             {
                 if (Directory.Exists(packageSourcePath))
                 {
-                    Packages.Add(new ModPackage(packageSourcePath));
+                    ModPackage entry = new(packageSourcePath);
+                    if(entry.Name != null) Packages.Add(entry);
                 } 
                 else if (File.Exists(packageSourcePath))
                 {
                     string fileName = packageSourcePath.Split("\\").Last();
                     string dirName = fileName[..^4];
                     string destPath = StorePath + "\\" + dirName;
+                    
 
                     if (!Directory.Exists(destPath))
                     {
@@ -183,17 +146,41 @@ namespace LCModManager
                         zip.ExtractToDirectory(destPath);
                         file.Dispose();
                         zip.Dispose();
-                    }
 
-                    Packages.Add(new ModPackage(destPath));
+                        ModPackage entry = new(destPath);
+
+                        if (entry.Name != null) Packages.Add(entry);
+                        else Directory.Delete(destPath, true);
+                    }
                 }
             }
+
+            public void RemovePackage(ModEntry package)
+            {
+                IEnumerable<ModPackage> query = Packages.Where(p => p.Name == package.Name);
+
+                foreach (ModPackage p in query)
+                {
+                    RemovePackage(p);
+                }
+            }
+
 
             public void RemovePackage(ModPackage package)
             {
                 if (Directory.Exists(package.Path)) Directory.Delete(package.Path, true);
 
                 Packages.Remove(package);
+            }
+
+            public void RemovePackages(IEnumerable<ModEntry> packages)
+            {
+                foreach (ModEntry p in packages) RemovePackage(p);
+            }
+
+            public void RemovePackages(IEnumerable<ModPackage> packages)
+            {
+                foreach (ModPackage p in packages) RemovePackage(p);
             }
             
             public void RefreshPackages()
@@ -205,6 +192,11 @@ namespace LCModManager
             public List<ModPackage> GetPackages()
             {
                 return [.. Packages];
+            }
+
+            public IEnumerable<ModPackage> SearchPackages(Func<ModPackage,bool> predicate)
+            {
+                return Packages.Where(predicate);
             }
         }
     }

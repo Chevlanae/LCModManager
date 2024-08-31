@@ -4,6 +4,7 @@ using System.Windows;
 
 namespace LCModManager
 {
+
     /// <summary>
     /// Interaction logic for App.xaml
     /// </summary>

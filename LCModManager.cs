@@ -5,9 +5,38 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Documents;
+using System.Windows.Media.Imaging;
 
 namespace LCModManager
 {
+    public interface IModEntry
+    {
+        public string? Name { get; }
+        public string? Description { get; }
+        public string? Version { get; }
+        public string? Website { get; }
+        public BitmapImage? Icon { get; }
+        public string[]? Dependencies { get; }
+    }
+
+    public class ModEntry : IModEntry
+    {
+        private string? _Name;
+        private string? _Description;
+        private string? _Version;
+        private string? _Website;
+        private BitmapImage? _Icon;
+        private string[]? _Dependencies;
+
+        public string? Name => _Name;
+        public string? Description => _Description;
+        public string? Version => _Version;
+        public string? Website => _Website;
+        public BitmapImage? Icon => _Icon;
+        public string[]? Dependencies => _Dependencies;
+    }
+
     static internal class AppConfig
     {
         static public string ResourcePath = Environment.GetEnvironmentVariable("APPDATA") + "\\LCModManager";
