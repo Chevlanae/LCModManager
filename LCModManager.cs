@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Documents;
+﻿using System.IO;
 using System.Windows.Media.Imaging;
 
 namespace LCModManager
@@ -20,23 +13,6 @@ namespace LCModManager
         public string[]? Dependencies { get; }
     }
 
-    public class ModEntry : IModEntry
-    {
-        private string? _Name;
-        private string? _Description;
-        private string? _Version;
-        private string? _Website;
-        private BitmapImage? _Icon;
-        private string[]? _Dependencies;
-
-        public string? Name => _Name;
-        public string? Description => _Description;
-        public string? Version => _Version;
-        public string? Website => _Website;
-        public BitmapImage? Icon => _Icon;
-        public string[]? Dependencies => _Dependencies;
-    }
-
     static internal class AppConfig
     {
         static public string ResourcePath = Environment.GetEnvironmentVariable("APPDATA") + "\\LCModManager";
@@ -46,7 +22,7 @@ namespace LCModManager
     static internal class GameDirectory
     {
         static public string substring = "steamapps\\common\\Lethal Company";
-        static public string? path = GameDirectory.Find();
+        static public string? path = Find();
 
         static public string? Find()
         {

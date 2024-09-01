@@ -10,14 +10,20 @@
 
   <ItemGroup>
     <None Remove="20231007_183420.jpg" />
+    <None Remove="Resources\Check-Icon.png" />
     <None Remove="Resources\Green_Plus.png" />
     <None Remove="Resources\RedXIcon.png" />
+    <None Remove="Resources\Warning-Icon.png" />
+    <None Remove="Resources\Web-Icon.png" />
   </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Resources\20231007_183420.jpg" />
+    <Resource Include="Resources\Check-Icon.png" />
     <Resource Include="Resources\Green_Plus.png" />
     <Resource Include="Resources\RedXIcon.png" />
+    <Resource Include="Resources\Warning-Icon.png" />
+    <Resource Include="Resources\Web-Icon.png" />
   </ItemGroup>
 
   <ItemGroup>

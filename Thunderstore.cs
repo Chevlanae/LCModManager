@@ -1,19 +1,9 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
-using System.ComponentModel;
+﻿using System.Collections.ObjectModel;
 using System.Data;
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
-using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 
 namespace LCModManager
@@ -30,19 +20,12 @@ namespace LCModManager
 
             public ModManifest(Stream fileData, JsonSerializerOptions options)
             {
-                try
-                {
-                    this = JsonSerializer.Deserialize<ModManifest>(fileData, options);
-                } catch { }
+                this = JsonSerializer.Deserialize<ModManifest>(fileData, options);
             }
 
             public ModManifest(string fileString, JsonSerializerOptions options)
             {
-                try
-                {
-                    this = JsonSerializer.Deserialize<ModManifest>(fileString, options);
-                }
-                catch { }
+                this = JsonSerializer.Deserialize<ModManifest>(fileString, options);
             }
         }
 
@@ -52,18 +35,11 @@ namespace LCModManager
             private string? _Path;
             private string? _ReadMe;
             private string? _ChangeLog;
-            private BitmapImage? _Icon;
             private ModManifest? _Manifest;
 
             public string? Path => _Path;
             public string? ReadMe => _ReadMe;
             public string? ChangeLog => _ChangeLog;
-            new public string? Name => _Manifest?.Name;
-            new public string? Version => _Manifest?.Version_Number;
-            new public string? Website => _Manifest?.Website_Url;
-            new public string? Description => _Manifest?.Description;
-            new public string[]? Dependencies => _Manifest?.Dependencies;
-            new public BitmapImage? Icon => _Icon;
 
             public ModPackage(string sourcePath)
             {
@@ -87,29 +63,32 @@ namespace LCModManager
 
                 try
                 {
-                    _Icon = new BitmapImage();
-                    _Icon.BeginInit();
-                    _Icon.UriSource = new Uri(sourcePath + "\\icon.png");
-                    _Icon.DecodePixelWidth = 64;
-                    _Icon.DecodePixelHeight = 64;
-                    _Icon.CacheOption = BitmapCacheOption.OnLoad;
-                    _Icon.EndInit();
+                    Icon = new BitmapImage();
+                    Icon.BeginInit();
+                    Icon.UriSource = new Uri(sourcePath + "\\icon.png");
+                    Icon.DecodePixelWidth = 64;
+                    Icon.DecodePixelHeight = 64;
+                    Icon.CacheOption = BitmapCacheOption.OnLoad;
+                    Icon.EndInit();
                 } catch
                 {
-                    _Icon = null;
+                    Icon = null;
                 }
 
                 try
                 {
                     _Manifest = new ModManifest(File.ReadAllText(sourcePath + "\\manifest.json"), new(JsonSerializerDefaults.Web));
+                    Name = _Manifest.Value.Name;
+                    Description = _Manifest.Value.Description;
+                    Version = _Manifest.Value.Version_Number;
+                    Website = _Manifest.Value.Website_Url;
+                    Dependencies = _Manifest.Value.Dependencies;
                 } catch
                 {
                     _Manifest = null;
                 }
             }
         }
-
-        
 
         internal class PackageManagerAPI
         {
@@ -124,21 +103,18 @@ namespace LCModManager
                 if (!Directory.Exists(StorePath)) Directory.CreateDirectory(StorePath);
             }
 
-            public void AddPackage(string packageSourcePath)
+            public void AddPackage(string packageSourcePath, bool isDirectory = false)
             {
-                if (Directory.Exists(packageSourcePath))
+                if (isDirectory)
                 {
                     ModPackage entry = new(packageSourcePath);
                     if(entry.Name != null) Packages.Add(entry);
-                } 
-                else if (File.Exists(packageSourcePath))
+                } else
                 {
-                    string fileName = packageSourcePath.Split("\\").Last();
-                    string dirName = fileName[..^4];
+                    string dirName = packageSourcePath.Split("\\").Last()[..^4];
                     string destPath = StorePath + "\\" + dirName;
-                    
 
-                    if (!Directory.Exists(destPath))
+                    if (GetFromName(dirName) == null && !Directory.Exists(destPath))
                     {
                         File.SetAttributes(packageSourcePath, FileAttributes.Normal);
                         using Stream file = File.Open(packageSourcePath, FileMode.Open, FileAccess.Read);
@@ -155,6 +131,13 @@ namespace LCModManager
                 }
             }
 
+            public void RemovePackage(ModPackage package)
+            {
+                if (Directory.Exists(package.Path)) Directory.Delete(package.Path, true);
+
+                Packages.Remove(package);
+            }
+
             public void RemovePackage(ModEntry package)
             {
                 IEnumerable<ModPackage> query = Packages.Where(p => p.Name == package.Name);
@@ -165,28 +148,20 @@ namespace LCModManager
                 }
             }
 
-
-            public void RemovePackage(ModPackage package)
+            public void RemovePackages(IEnumerable<ModPackage> packages)
             {
-                if (Directory.Exists(package.Path)) Directory.Delete(package.Path, true);
-
-                Packages.Remove(package);
+                foreach (ModPackage p in packages) RemovePackage(p);
             }
 
             public void RemovePackages(IEnumerable<ModEntry> packages)
             {
                 foreach (ModEntry p in packages) RemovePackage(p);
             }
-
-            public void RemovePackages(IEnumerable<ModPackage> packages)
-            {
-                foreach (ModPackage p in packages) RemovePackage(p);
-            }
             
             public void RefreshPackages()
             {
                 Packages.Clear();
-                foreach (var dir in Directory.GetDirectories(StorePath)) AddPackage(dir);
+                foreach (var dir in Directory.GetDirectories(StorePath)) AddPackage(dir, true);
             }
 
             public List<ModPackage> GetPackages()
@@ -194,9 +169,17 @@ namespace LCModManager
                 return [.. Packages];
             }
 
-            public IEnumerable<ModPackage> SearchPackages(Func<ModPackage,bool> predicate)
+            public ModPackage? GetFromName(string name)
             {
-                return Packages.Where(predicate);
+                foreach (ModPackage package in Packages)
+                {
+                    if (package.Name != null)
+                    {
+                        Regex reg = new(package.Name);
+                        if (reg.IsMatch(name)) return package;
+                    }
+                }
+                return null;
             }
         }
     }

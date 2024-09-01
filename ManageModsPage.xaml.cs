@@ -1,26 +1,94 @@
 ﻿using LCModManager.Thunderstore;
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace LCModManager
 {
+    public class ModEntry : IModEntry
+    {
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public string? Version { get; set; }
+        public string? Website { get; set; }
+        public BitmapImage? Icon { get; set; }
+        public string[]? Dependencies { get; set; }
+        public string[]? MissingDependencies { get; set; }
+        public bool IsMissingDependencies
+        {
+            get
+            {
+                if (MissingDependencies != null && MissingDependencies.Length > 0) return true;
+                else return false;
+            }
+        }
+
+        public void GetMissingDependencies(IEnumerable<ModEntry> entries)
+        {
+            if(Dependencies != null)
+            {
+                List<string> missingDeps = [];
+
+                foreach (string depStr in Dependencies)
+                {
+                    bool found = false;
+                    foreach (ModEntry entry in entries)
+                    {
+                        if(entry.Name != null && entry.Version != null)
+                        {
+                            //Entry Regex Generation
+                            string[] ints = entry.Version.Split('.');
+                            for (int i = 0; i < ints.Length; i++)
+                            {
+                                //Skip regex replace for major version
+                                if (i == 0) continue;
+                                else
+                                {
+                                    char[] chars = ints[i].ToCharArray();
+                                    string newStr = "";
+
+                                    //Converts integer to a pattern matching any number less than or equal to the integer
+                                    for (int j = 0; j < chars.Length; j++)
+                                    {
+                                        if (j == 0)
+                                        {
+                                            newStr += "[0-" + chars[j] + "]";
+                                        }
+                                        else
+                                        {
+                                            newStr += "[0-9]";
+                                        }
+                                    }
+
+                                    ints[i] = newStr;
+                                }
+                            }
+
+                            //Pattern to match to end of depStr
+                            Regex reg = new(entry.Name + "-" + String.Join("\\.", ints) + "$");
+
+                            //Check dependency string against regex
+                            if (reg.IsMatch(depStr))
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+                        
+                    }
+
+                    if (!found) missingDeps.Add(depStr);
+                }
+
+                MissingDependencies = [.. missingDeps];
+            }
+        }
+    }
+
     /// <summary>
     /// Interaction logic for ManageModsPage.xaml
     /// </summary>
@@ -47,13 +115,38 @@ namespace LCModManager
 
             ModListControl.ItemsSource = ModList;
 
-            RefreshList_Click(true);
+            RefreshModList(true);
+        }
+
+        private void RefreshModList()
+        {
+            ModList.Clear();
+
+            foreach (ModEntry package in thunderStorePkgMgr.Packages)
+            {
+                ModList.Add(package);
+            }
+
+            foreach(ModEntry mod in ModList) mod.GetMissingDependencies(ModList);
+
+
+        }
+
+
+        private void RefreshModList(bool refreshCache)
+        {
+            if (refreshCache)
+            {
+                thunderStorePkgMgr.RefreshPackages();
+            }
+
+            RefreshModList();
         }
 
         private void AddPackage_Click(object sender, RoutedEventArgs e)
         {
             // Create OpenFileDialog 
-            Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog
+            Microsoft.Win32.OpenFileDialog dlg = new()
             {
                 // Set filter for file extension and default file extension 
                 DefaultExt = ".zip",
@@ -73,41 +166,18 @@ namespace LCModManager
                     thunderStorePkgMgr.AddPackage(filename);
                 }
 
-                RefreshList_Click();
-            }
-        }
-
-        private void RefreshList_Click()
-        {
-            ModList.Clear();
-
-            foreach(ModPackage package in thunderStorePkgMgr.Packages)
-            {
-                ModList.Add(package);
-            }
-        }
-
-
-        private void RefreshList_Click(bool refreshCache)
-        {
-            if (refreshCache)
-            {
-                thunderStorePkgMgr.RefreshPackages();
+                RefreshModList();
             }
 
-            RefreshList_Click();
-        }
+            e.Handled = true;
 
-        private void RefreshList_Click(object sender, RoutedEventArgs e)
-        {
-            RefreshList_Click();
         }
 
         private void RemovePackage_Click(object sender, RoutedEventArgs e)
         {
             List<ModPackage> items = [];
 
-            foreach(ModPackage entry in ModListControl.SelectedItems)
+            foreach (ModPackage entry in ModListControl.SelectedItems)
             {
                 items.Add(entry);
             }
@@ -118,18 +188,28 @@ namespace LCModManager
                 thunderStorePkgMgr.RemovePackage(package);
             }
 
-            RefreshList_Click();
+            RefreshModList();
+            e.Handled = true;
         }
 
-        private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
+        private void WebPackage_Click(object sender, RoutedEventArgs e)
         {
-            ProcessStartInfo info = new()
-            {
-                FileName = "explorer.exe",
-                Arguments = e.Uri.ToString(),
-            };
 
-            Process.Start(info);
+        }
+
+        private void RefreshModList_Click(object sender, RoutedEventArgs e)
+        {
+            RefreshModList();
+            e.Handled = true;
+        }
+
+        private void EntryDependenciesButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button senderBtn && senderBtn.Content is Popup popup && popup.Child is Grid grid)
+            {
+                popup.IsOpen = !popup.IsOpen;
+            }
+
             e.Handled = true;
         }
     }
