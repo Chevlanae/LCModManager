@@ -18,5 +18,13 @@
             <Setter Property="VerticalAlignment" Value="Center" />
             <EventSetter Event="Hyperlink.RequestNavigate" Handler="Hyperlink_RequestNavigate" />
         </Style>
+        <Style x:Key="ModListDataGrid" TargetType="DataGrid">
+            <Setter Property="AutoGenerateColumns" Value="False" />
+            <Setter Property="CanUserReorderColumns" Value="False" />
+            <Setter Property="CanUserResizeRows" Value="False" />
+            <Setter Property="CanUserDeleteRows" Value="False" />
+            <Setter Property="CanUserAddRows" Value="False" />
+            <Setter Property="IsReadOnly" Value="True" />
+        </Style>
     </Application.Resources>
 </Application>

@@ -8,7 +8,7 @@
         Height="Auto" 
         Width="Auto"
         d:DesignHeight="409.928" d:DesignWidth="569.813">
-    <Grid x:Name="MainGrid" Background="FloralWhite">
+    <Grid Background="FloralWhite">
         <Grid x:Name="Layout" Margin="0,0,0,15">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="20" />
@@ -23,9 +23,8 @@
                         <TranslateTransform X="20"/>
                     </TransformGroup>
                 </Menu.RenderTransform>
-                <MenuItem Header="Manage Mods" Click="NavTo_ManageMods"/>
-                <MenuItem Header="Create Profile" Click="NavTo_CreateProfile"/>
-                <MenuItem Header="Install/Run" Click="NavTo_InstallRun"/>
+                <MenuItem Header="Mods" Click="NavTo_ManageMods"/>
+                <MenuItem Header="Profiles" Click="NavTo_CreateProfile"/>
             </Menu>
             <Frame x:Name="ViewFrame" Grid.Column="1" NavigationUIVisibility="Hidden"/>
         </Grid>

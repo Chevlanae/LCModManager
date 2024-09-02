@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using LCModManager.Thunderstore;
+using System.Windows;
 using System.Windows.Controls;
 
 namespace LCModManager
@@ -10,13 +11,11 @@ namespace LCModManager
     {
         private Page ManageMods;
         private Page CreateProfile;
-        private Page InstallRun;
 
         public MainWindow()
         {
             ManageMods = new ManageModsPage();
             CreateProfile = new CreateProfilePage();
-            InstallRun = new InstallRunPage();
            
             InitializeComponent();
             NavTo_ManageMods();
@@ -40,16 +39,6 @@ namespace LCModManager
         private void NavTo_CreateProfile(object sender, RoutedEventArgs e)
         {
             ViewFrame.Navigate(CreateProfile);
-        }
-
-        private void NavTo_InstallRun()
-        {
-            ViewFrame.Navigate(InstallRun);
-        }
-
-        private void NavTo_InstallRun(object sender, RoutedEventArgs e)
-        {
-            ViewFrame.Navigate(InstallRun);
         }
     }
 }

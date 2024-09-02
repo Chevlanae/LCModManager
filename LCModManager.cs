@@ -1,16 +1,91 @@
 ﻿using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows.Media.Imaging;
 
 namespace LCModManager
 {
     public interface IModEntry
     {
-        public string? Name { get; }
-        public string? Description { get; }
-        public string? Version { get; }
-        public string? Website { get; }
-        public BitmapImage? Icon { get; }
-        public string[]? Dependencies { get; }
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public string? Version { get; set; }
+        public string? Website { get; set; }
+        public string? IconUri { get; set; }
+        public string[]? Dependencies { get; set; }
+        public string[]? MissingDependencies { get; set; }
+    }
+
+    public class ModEntryBase : IModEntry
+    {
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public string? Version { get; set; }
+        public string? Website { get; set; }
+        public string? IconUri { get; set; }
+        public string[]? Dependencies { get; set; }
+        public string[]? MissingDependencies { get; set; }
+    }
+
+    public class ModEntry : ModEntryBase
+    {
+        public BitmapImage? Icon { get; set; }
+        public bool IsMissingDependencies
+        {
+            get
+            {
+                if (MissingDependencies != null && MissingDependencies.Length > 0) return true;
+                else return false;
+            }
+        }
+
+        public void GetMissingDependencies(IEnumerable<ModEntry> entries)
+        {
+            if (Dependencies != null)
+            {
+                List<string> missingDeps = [];
+
+                foreach (string depStr in Dependencies)
+                {
+                    bool found = false;
+                    foreach (ModEntry entry in entries)
+                    {
+                        if (entry.Name != null && entry.Version != null)
+                        {
+                            string pattern = entry.Name.Split("-")[0];
+
+                            //Pattern to match to end of depStr
+                            Regex reg = new(pattern);
+
+                            //Check dependency string against regex
+                            if (reg.IsMatch(depStr))
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+
+                    }
+
+                    if (!found) missingDeps.Add(depStr);
+                }
+
+                MissingDependencies = [.. missingDeps];
+            }
+        }
+
+        public ModEntryBase ToModEntryBase()
+        {
+            return new ModEntryBase
+            {
+                Name = Name,
+                Description = Description,
+                Version = Version,
+                Website = Website,
+                IconUri = IconUri,
+                Dependencies = Dependencies,
+                MissingDependencies = MissingDependencies
+            };
+        }
     }
 
     static internal class AppConfig
@@ -42,9 +117,10 @@ namespace LCModManager
     }
 
 
-    internal class Utils
+    static internal class Utils
     {
-        static void CopyDirectory(string sourceDir, string destinationDir, bool recursive)
+
+        static public void CopyDirectory(string sourceDir, string destinationDir, bool recursive)
         {
             // Get information about the source directory
             var dir = new DirectoryInfo(sourceDir);

@@ -31,15 +31,14 @@ namespace LCModManager
 
         internal class ModPackage : ModEntry
         {
-
-            private string? _Path;
             private string? _ReadMe;
             private string? _ChangeLog;
             private ModManifest? _Manifest;
+            private string _Path;
 
-            public string? Path => _Path;
             public string? ReadMe => _ReadMe;
             public string? ChangeLog => _ChangeLog;
+            public string Path => _Path;
 
             public ModPackage(string sourcePath)
             {
@@ -90,57 +89,53 @@ namespace LCModManager
             }
         }
 
-        internal class PackageManagerAPI
+        static internal class PackageManager
         {
-            readonly string StorePath = AppConfig.PackageStorePath + "\\Thunderstore";
-            public ObservableCollection<ModPackage> Packages;
+            static public string StorePath = AppConfig.PackageStorePath + "\\Thunderstore";
 
 
-            public PackageManagerAPI()
+            static public void AddPackage(string packageSourcePath)
             {
-                Packages = [];
 
-                if (!Directory.Exists(StorePath)) Directory.CreateDirectory(StorePath);
-            }
+                string dirName = packageSourcePath.Split("\\").Last()[..^4];
+                string destPath = StorePath + "\\" + dirName;
 
-            public void AddPackage(string packageSourcePath, bool isDirectory = false)
-            {
-                if (isDirectory)
+                if (!Directory.Exists(destPath))
                 {
-                    ModPackage entry = new(packageSourcePath);
-                    if(entry.Name != null) Packages.Add(entry);
-                } else
-                {
-                    string dirName = packageSourcePath.Split("\\").Last()[..^4];
-                    string destPath = StorePath + "\\" + dirName;
-
-                    if (GetFromName(dirName) == null && !Directory.Exists(destPath))
-                    {
-                        File.SetAttributes(packageSourcePath, FileAttributes.Normal);
-                        using Stream file = File.Open(packageSourcePath, FileMode.Open, FileAccess.Read);
-                        using ZipArchive zip = new(file);
-                        zip.ExtractToDirectory(destPath);
-                        file.Dispose();
-                        zip.Dispose();
-
-                        ModPackage entry = new(destPath);
-
-                        if (entry.Name != null) Packages.Add(entry);
-                        else Directory.Delete(destPath, true);
-                    }
+                    File.SetAttributes(packageSourcePath, FileAttributes.Normal);
+                    using Stream file = File.Open(packageSourcePath, FileMode.Open, FileAccess.Read);
+                    using ZipArchive zip = new(file);
+                    zip.ExtractToDirectory(destPath);
+                    file.Dispose();
+                    zip.Dispose();
                 }
             }
 
-            public void RemovePackage(ModPackage package)
+            static public void AddPackage(string packageSourcePath, bool isDirectory = false)
             {
-                if (Directory.Exists(package.Path)) Directory.Delete(package.Path, true);
+                if (isDirectory)
+                {
+                    string dirName = packageSourcePath.Split("\\").Last();
+                    string destPath = StorePath + "\\" + dirName;
 
-                Packages.Remove(package);
+                    if (!Directory.Exists(destPath))
+                    {
+                        Utils.CopyDirectory(packageSourcePath, destPath, true);
+                    }
+                }
+                else AddPackage(packageSourcePath);
             }
 
-            public void RemovePackage(ModEntry package)
+            static public void RemovePackage(ModPackage package)
             {
-                IEnumerable<ModPackage> query = Packages.Where(p => p.Name == package.Name);
+                if (Directory.Exists(package.Path)) Directory.Delete(package.Path, true);
+            }
+
+            static public void RemovePackage(ModEntry package)
+            {
+                List<ModPackage> packages = GetPackages();
+
+                IEnumerable<ModPackage> query = packages.Where(p => p.Name == package.Name);
 
                 foreach (ModPackage p in query)
                 {
@@ -148,30 +143,33 @@ namespace LCModManager
                 }
             }
 
-            public void RemovePackages(IEnumerable<ModPackage> packages)
+            static public void RemovePackages(IEnumerable<ModPackage> packages)
             {
                 foreach (ModPackage p in packages) RemovePackage(p);
             }
 
-            public void RemovePackages(IEnumerable<ModEntry> packages)
+            static public void RemovePackages(IEnumerable<ModEntry> packages)
             {
                 foreach (ModEntry p in packages) RemovePackage(p);
             }
-            
-            public void RefreshPackages()
+
+            static public List<ModPackage> GetPackages()
             {
-                Packages.Clear();
-                foreach (var dir in Directory.GetDirectories(StorePath)) AddPackage(dir, true);
+                List<ModPackage> packages = [];
+
+                foreach (string file in Directory.GetDirectories(StorePath))
+                {
+                    packages.Add(new ModPackage(file));
+                }
+
+                return packages;
             }
 
-            public List<ModPackage> GetPackages()
+            static public ModPackage? GetFromName(string name)
             {
-                return [.. Packages];
-            }
+                List<ModPackage> packages = GetPackages();
 
-            public ModPackage? GetFromName(string name)
-            {
-                foreach (ModPackage package in Packages)
+                foreach (ModPackage package in packages)
                 {
                     if (package.Name != null)
                     {
