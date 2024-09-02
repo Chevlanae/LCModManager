@@ -1,10 +1,6 @@
-﻿using System.Configuration;
-using System.Data;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
-using System.Text.RegularExpressions;
 using System.Windows;
-using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 
 namespace LCModManager

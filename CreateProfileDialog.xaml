@@ -4,72 +4,17 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:LCModManager"
+        WindowStartupLocation="CenterOwner"
         mc:Ignorable="d"
-        Title="Add mods to profile" MinHeight="400" MinWidth="400">
+        Title="Create Profile" Height="140" Width="200" ResizeMode="NoResize">
     <Grid>
-        <DataGrid x:Name="ModListControl" GridLinesVisibility="Horizontal" Style="{StaticResource ModListDataGrid}">
-            <DataGrid.Resources>
-                <ResourceDictionary>
-                    <Style x:Key="{x:Type DataGridCell}" TargetType="{x:Type DataGridCell}">
-                        <Setter Property="Background" Value="Transparent" />
-                        <Setter Property="BorderBrush" Value="Transparent" />
-                        <Setter Property="BorderThickness" Value="0" />
-                        <Style.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="Transparent" />
-                                <Setter Property="BorderBrush" Value="Transparent" />
-                                <Setter Property="Foreground" Value="Black"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                    <Style TargetType="{x:Type DataGridRow}">
-                        <Setter Property="Background" Value="Transparent" />
-                        <Setter Property="BorderBrush" Value="Transparent" />
-                        <Setter Property="BorderThickness" Value="0" />
-                        <Setter Property="MinHeight" Value="64" />
-                        <Style.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Background" Value="LightBlue" />
-                                <Setter Property="BorderBrush" Value="Transparent" />
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                    <Style x:Key="TextBlockStyle" TargetType="TextBlock" >
-                        <Setter Property="Padding" Value="10" />
-                        <Setter Property="HorizontalAlignment" Value="Left" />
-                        <Setter Property="VerticalAlignment" Value="Center" />
-                        <Setter Property="TextWrapping" Value="Wrap" />
-                    </Style>
-                </ResourceDictionary>
-            </DataGrid.Resources>
-            <DataGrid.Columns>
-                <DataGridTemplateColumn Header="Icon" MinWidth="64">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <Image Height="64" Width="64" Source="{Binding Path=Icon}" />
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Name}"  MinWidth="100" MaxWidth="200" Width="*" >
-                    <DataGridTextColumn.Header>
-                        <TextBlock Text="Name" />
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
-                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Description}" MinWidth="300"  Width="*">
-                    <DataGridTextColumn.Header>
-                        <TextBlock Text="Description" />
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
-                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Version}" MinWidth="70">
-                    <DataGridTextColumn.Header>
-                        <TextBlock Text="Version" />
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
-            </DataGrid.Columns>
-        </DataGrid>
-        <StackPanel Orientation="Horizontal"  HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="120">
-            <Button Content="OK" Click="OKButton_Click" IsDefault="True" Margin="10" Width="30" Height="30" />
-            <Button Content="CANCEL" Click="CANCELButton_Click" IsCancel="True" Margin="10" Height="30" />
+        <StackPanel >
+            <TextBlock Text="Enter new profile name:" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+            <TextBox x:Name="NewProfileName" Margin="30,10,30,10" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="10"  HorizontalAlignment="Center" VerticalAlignment="Bottom">
+            <Button Content="Enter" Click="EnterButton_Click" IsDefault="True"  Margin="10,0,10,0"  Width="40" Height="20" />
+            <Button Content="Cancel" Click="CancelButton_Click" IsCancel="True" Margin="10,0,10,0" Width="60" Height="20" />
         </StackPanel>
     </Grid>
 </Window>

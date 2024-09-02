@@ -1,5 +1,5 @@
-﻿using System.Collections.ObjectModel;
-using System.Data;
+﻿using System.Data;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Text.Json;
@@ -34,15 +34,13 @@ namespace LCModManager
             private string? _ReadMe;
             private string? _ChangeLog;
             private ModManifest? _Manifest;
-            private string _Path;
 
             public string? ReadMe => _ReadMe;
             public string? ChangeLog => _ChangeLog;
-            public string Path => _Path;
 
             public ModPackage(string sourcePath)
             {
-                _Path = sourcePath;
+                Path = sourcePath;
                 
                 try
                 {
@@ -77,14 +75,14 @@ namespace LCModManager
                 try
                 {
                     _Manifest = new ModManifest(File.ReadAllText(sourcePath + "\\manifest.json"), new(JsonSerializerDefaults.Web));
-                    Name = _Manifest.Value.Name;
+                    Name = _Manifest.Value.Name ?? "";
                     Description = _Manifest.Value.Description;
                     Version = _Manifest.Value.Version_Number;
                     Website = _Manifest.Value.Website_Url;
                     Dependencies = _Manifest.Value.Dependencies;
                 } catch
                 {
-                    _Manifest = null;
+                    throw new Exception("Could not serialize JSON manifest at: \"" + sourcePath + "\\manifest.json" + "\"");
                 }
             }
         }
@@ -97,8 +95,15 @@ namespace LCModManager
             static public void AddPackage(string packageSourcePath)
             {
 
-                string dirName = packageSourcePath.Split("\\").Last()[..^4];
-                string destPath = StorePath + "\\" + dirName;
+                string storeName = packageSourcePath.Split("\\").Last()[..^4];
+
+                Regex duplicateFilenameReg = new("\\([0-9]\\)$"); 
+                if (duplicateFilenameReg.IsMatch(storeName))
+                {
+                    storeName = storeName[0..^3];
+                }
+
+                string destPath = StorePath + "\\" + storeName;
 
                 if (!Directory.Exists(destPath))
                 {
@@ -159,7 +164,13 @@ namespace LCModManager
 
                 foreach (string file in Directory.GetDirectories(StorePath))
                 {
-                    packages.Add(new ModPackage(file));
+                    try
+                    {
+                        packages.Add(new ModPackage(file));
+                    } catch (Exception e)
+                    {
+                        Debug.WriteLine(e);
+                    }
                 }
 
                 return packages;
@@ -167,14 +178,25 @@ namespace LCModManager
 
             static public ModPackage? GetFromName(string name)
             {
-                List<ModPackage> packages = GetPackages();
 
-                foreach (ModPackage package in packages)
+                foreach (ModPackage package in GetPackages())
+                {
+                    if (package.Name != null && package.Name == name)
+                    {
+                        return package;
+                    }
+                }
+                return null;
+            }
+
+            static public ModPackage? GetFromName(Regex reg)
+            {
+
+                foreach (ModPackage package in GetPackages())
                 {
                     if (package.Name != null)
                     {
-                        Regex reg = new(package.Name);
-                        if (reg.IsMatch(name)) return package;
+                        if (reg.IsMatch(package.Name)) return package;
                     }
                 }
                 return null;

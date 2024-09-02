@@ -6,7 +6,8 @@ namespace LCModManager
 {
     public interface IModEntry
     {
-        public string? Name { get; set; }
+        public string Path { get; set; }
+        public string Name { get; set; }
         public string? Description { get; set; }
         public string? Version { get; set; }
         public string? Website { get; set; }
@@ -17,13 +18,20 @@ namespace LCModManager
 
     public class ModEntryBase : IModEntry
     {
-        public string? Name { get; set; }
+        public string Path { get; set; }
+        public string Name { get; set; }
         public string? Description { get; set; }
         public string? Version { get; set; }
         public string? Website { get; set; }
         public string? IconUri { get; set; }
         public string[]? Dependencies { get; set; }
         public string[]? MissingDependencies { get; set; }
+
+        public ModEntryBase()
+        {
+            Path = "";
+            Name = "";
+        }
     }
 
     public class ModEntry : ModEntryBase
@@ -73,10 +81,44 @@ namespace LCModManager
             }
         }
 
+        public void GetMissingDependencies(IEnumerable<ModEntryBase> entries)
+        {
+            if (Dependencies != null)
+            {
+                List<string> missingDeps = [];
+
+                foreach (string depStr in Dependencies)
+                {
+                    bool found = false;
+                    foreach (ModEntryBase entry in entries)
+                    {
+                        if (entry.Name != null && entry.Version != null)
+                        {
+                            string nameSubStr = entry.Name;
+                            string depSubStr = depStr.Split("-")[^2];
+
+                            //Check dependency string against regex
+                            if (nameSubStr == depSubStr)
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+
+                    }
+
+                    if (!found) missingDeps.Add(depStr);
+                }
+
+                MissingDependencies = [.. missingDeps];
+            }
+        }
+
         public ModEntryBase ToModEntryBase()
         {
             return new ModEntryBase
             {
+                Path = Path,
                 Name = Name,
                 Description = Description,
                 Version = Version,

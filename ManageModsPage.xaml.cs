@@ -1,11 +1,7 @@
 ﻿using LCModManager.Thunderstore;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Media.Imaging;
 
 namespace LCModManager
 {
@@ -58,7 +54,7 @@ namespace LCModManager
             bool? result = dlg.ShowDialog();
 
             // Get the selected file name and display in a TextBox 
-            if (result != false && result != null && dlg.FileNames.Length != 0)
+            if (result != null && result != false && dlg.FileNames.Length != 0)
             {
                 foreach(var filename in dlg.FileNames)
                 {
@@ -83,7 +79,6 @@ namespace LCModManager
 
             foreach (ModPackage package in items)
             {
-                ModList.Remove(package);
                 PackageManager.RemovePackage(package);
             }
 

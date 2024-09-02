@@ -1,5 +1,4 @@
-﻿using LCModManager.Thunderstore;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 
 namespace LCModManager
