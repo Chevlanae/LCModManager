@@ -202,5 +202,10 @@ namespace LCModManager
                 return null;
             }
         }
+
+        static internal class WebAPI
+        {
+            static public string EndPointURL = "";
+        }
     }
 }

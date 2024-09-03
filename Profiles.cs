@@ -5,29 +5,32 @@ using System.Xml.Serialization;
 
 namespace LCModManager
 {
-    [ValueConversion(typeof(ModProfile), typeof(String))]
-    public class ModProfileConverter : IValueConverter
+    namespace Converters
     {
-        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        [ValueConversion(typeof(ModProfile), typeof(String))]
+        public class ModProfileConverter : IValueConverter
         {
-            if (value is ModProfile profile)
+            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
             {
-                return profile.Name;
+                if (value is ModProfile profile)
+                {
+                    return profile.Name;
+                }
+                else return "";
             }
-            else return "";
-        }
 
-        public object ConvertBack(object value, Type targetType, object paramter, CultureInfo culture)
-        {
-            if (value is string name)
+            public object ConvertBack(object value, Type targetType, object paramter, CultureInfo culture)
             {
-                string path = Profiles.StorePath + "\\" + name + ".xml";
-                ModProfile? profile = Profiles.GetProfile(path);
+                if (value is string name)
+                {
+                    string path = Profiles.StorePath + "\\" + name + ".xml";
+                    ModProfile? profile = Profiles.GetProfile(path);
 
-                if (profile != null) return profile;
+                    if (profile != null) return profile;
+                    else return new ModProfile();
+                }
                 else return new ModProfile();
             }
-            else return new ModProfile();
         }
     }
 

@@ -14,7 +14,10 @@
             <RowDefinition />
             <RowDefinition Height="30" />
         </Grid.RowDefinitions>
-        <DataGrid x:Name="ModListControl" GridLinesVisibility="Horizontal"  Style="{StaticResource DataGridStyle}">
+        <DataGrid x:Name="ModListControl" 
+                  GridLinesVisibility="Horizontal"  
+                  Style="{StaticResource DataGridStyle}"
+                  PreviewKeyDown="ModListControl_PreviewKeyDown">
             <DataGrid.Resources>
                 <ResourceDictionary>
                     <Style x:Key="{x:Type DataGridCell}" TargetType="{x:Type DataGridCell}">

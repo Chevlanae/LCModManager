@@ -10,43 +10,39 @@ namespace LCModManager
     /// </summary>
     public partial class CreateProfilePage : Page
     {
-        public ObservableCollection<ModProfile> ProfileList;
-        public ObservableCollection<ModEntry> ModList;
-        public ModProfile? SelectedProfile;
+        public ObservableCollection<ModEntry> ModList = [];
 
         public CreateProfilePage()
         {
-            ProfileList = [];
-            ModList = [];
-
             InitializeComponent();
 
-            ProfileSelectorControl.ItemsSource = ProfileList;
+
             ModListControl.ItemsSource = ModList;
 
             RefreshProfiles();
             RefreshModList();
+
         }
 
 
 
         private void RefreshProfiles()
         {
-            ProfileList.Clear();
+            ProfileSelectorControl.Items.Clear();
 
             foreach (ModProfile profile in Profiles.GetProfiles())
             {
-                ProfileList.Add(profile);
+                ProfileSelectorControl.Items.Add(profile);
             }
         }
 
         private void RefreshModList()
         {
-            if (SelectedProfile != null)
+            if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
                 ModList.Clear();
 
-                foreach (ModEntryBase entry in SelectedProfile.ModList)
+                foreach (ModEntryBase entry in profile.ModList)
                 {
                     ModEntry? mod = PackageManager.GetFromName(entry.Name);
 
@@ -56,24 +52,52 @@ namespace LCModManager
                     }
                 }
 
-                foreach (ModEntry mod in ModList) mod.GetMissingDependencies(SelectedProfile.ModList);
+                foreach (ModEntry mod in ModList)
+                {
+                    mod.GetMissingDependencies(ModList);
+                }
             }
         }
 
-        private void ProfileSelectorControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void CreateProfileButton_Click(object sender, RoutedEventArgs e)
         {
-            if (e.AddedItems.Count > 0 && e.AddedItems[0] is ModProfile profile)
+            CreateProfileDialog dialog = new();
+
+            if (dialog.ShowDialog() == true)
             {
-                SelectedProfile = profile;
-                RefreshModList();
+                ModProfile newProfile = new(dialog.NewProfileName.Text);
+
+                Profiles.AddProfile(newProfile);
+
+                ProfileSelectorControl.SelectedIndex = ProfileSelectorControl.Items.Add(newProfile);
+
             }
 
             e.Handled = true;
         }
 
+        private void DeleteProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ProfileSelectorControl.SelectedItem is ModProfile profile)
+            {
+                Profiles.DeleteProfile(profile);
+
+                RefreshProfiles();
+
+                ModList.Clear();
+            }
+
+            e.Handled = true;
+        }
+
+        private void ProfileSelectorControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            RefreshModList();
+        }
+
         private void AddModsButton_Click(object sender, RoutedEventArgs e)
         {
-            if(SelectedProfile != null)
+            if(ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
                 AddModsDialog dialog = new(ModList);
 
@@ -83,15 +107,15 @@ namespace LCModManager
                     {
                         if (package is ModEntry modEntry)
                         {
-                            SelectedProfile.Add(modEntry.ToModEntryBase());
+                            profile.Add(modEntry.ToModEntryBase());
                         }
                         else if(package is ModEntryBase modEntryBase)
                         {
-                            SelectedProfile.Add(modEntryBase);
+                            profile.Add(modEntryBase);
                         }
                     }
 
-                    Profiles.SaveProfile(SelectedProfile);
+                    Profiles.SaveProfile(profile);
 
                     RefreshModList();
                 }
@@ -102,7 +126,7 @@ namespace LCModManager
 
         private void RemoveModsButton_Click(object sender, RoutedEventArgs e)
         {
-            if(SelectedProfile != null)
+            if(ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
                 List<ModEntry> items = [];
 
@@ -118,47 +142,11 @@ namespace LCModManager
                 {
                     if(package is ModEntry modEntry)
                     {
-                        SelectedProfile.RemoveAll(x => x.Name == modEntry.Name);
+                        profile.RemoveAll(x => x.Name == modEntry.Name);
                     }
                 }
 
                 RefreshModList();
-            }
-
-            e.Handled = true;
-        }
-
-        private void CreateProfileButton_Click(object sender, RoutedEventArgs e)
-        {
-            CreateProfileDialog dialog = new();
-
-            if(dialog.ShowDialog() == true)
-            {
-                ModProfile newProfile = new(dialog.NewProfileName.Text);
-
-                Profiles.AddProfile(newProfile);
-
-                SelectedProfile = newProfile;
-
-                ProfileSelectorControl.SelectedValue = SelectedProfile;
-
-                RefreshProfiles();
-            }
-
-            e.Handled = true;
-        }
-
-        private void DeleteProfileButton_Click(object sender, RoutedEventArgs e)
-        {
-            if(SelectedProfile != null)
-            {
-                ProfileList.Remove(SelectedProfile);
-                Profiles.DeleteProfile(SelectedProfile);
-
-                SelectedProfile = null;
-                ModList.Clear();
-
-                RefreshProfiles();
             }
 
             e.Handled = true;

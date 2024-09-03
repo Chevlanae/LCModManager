@@ -1,6 +1,7 @@
 ﻿using LCModManager.Thunderstore;
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Input;
 
 namespace LCModManager
 {
@@ -9,13 +10,11 @@ namespace LCModManager
     /// </summary>
     public partial class AddModsDialog : Window
     {
-        public ObservableCollection<ModEntry> ModList;
+        public ObservableCollection<ModEntry> ModList = [];
 
         public AddModsDialog()
         {
             InitializeComponent();
-
-            ModList = [];
 
             foreach (ModEntry package in PackageManager.GetPackages()) ModList.Add(package);
 
@@ -56,6 +55,15 @@ namespace LCModManager
         private void CANCELButton_Click(object sender, RoutedEventArgs e)
         {
             DialogResult = false;
+        }
+
+        private void ModListControl_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if(e.Key == Key.Enter)
+            {
+                DialogResult = true;
+                e.Handled = true;
+            }
         }
     }
 }
