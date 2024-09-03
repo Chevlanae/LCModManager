@@ -13,6 +13,7 @@
     <None Remove="Resources\Add-Document-Icon.png" />
     <None Remove="Resources\Check-Icon.png" />
     <None Remove="Resources\Green_Plus.png" />
+    <None Remove="Resources\Problem-Icon.png" />
     <None Remove="Resources\RedXIcon.png" />
     <None Remove="Resources\TrashCan-Icon.png" />
     <None Remove="Resources\Warning-Icon.png" />
@@ -20,6 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Resource Include="Resources\Problem-Icon.png" />
     <Resource Include="Resources\TrashCan-Icon.png" />
   </ItemGroup>
 

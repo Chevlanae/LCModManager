@@ -2,6 +2,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using LCModManager.Thunderstore;
+using Microsoft.Win32;
 
 namespace LCModManager
 {
@@ -16,19 +17,9 @@ namespace LCModManager
         {
             InitializeComponent();
 
-
             ModListControl.ItemsSource = ModList;
 
-            RefreshProfiles();
             RefreshModList();
-
-        }
-
-
-
-        private void RefreshProfiles()
-        {
-            ProfileSelectorControl.Items.Clear();
 
             foreach (ModProfile profile in Profiles.GetProfiles())
             {
@@ -46,15 +37,12 @@ namespace LCModManager
                 {
                     ModEntry? mod = PackageManager.GetFromName(entry.Name);
 
-                    if(mod != null)
-                    {
-                        ModList.Add(mod);
-                    }
+                    if(mod != null) ModList.Add(mod);
                 }
 
                 foreach (ModEntry mod in ModList)
                 {
-                    mod.GetMissingDependencies(ModList);
+                    mod.ProcessDependencies(ModList);
                 }
             }
         }
@@ -67,10 +55,52 @@ namespace LCModManager
             {
                 ModProfile newProfile = new(dialog.NewProfileName.Text);
 
-                Profiles.AddProfile(newProfile);
+                if (!ProfileSelectorControl.Items.Contains(newProfile))
+                {
+                    Profiles.AddProfile(newProfile);
 
-                ProfileSelectorControl.SelectedIndex = ProfileSelectorControl.Items.Add(newProfile);
+                    ProfileSelectorControl.SelectedIndex = ProfileSelectorControl.Items.Add(newProfile);
+                }
+            }
 
+            e.Handled = true;
+        }
+
+        private void ImportProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog dialog = new()
+            {
+                DefaultExt = ".xml",
+                Filter = "XML Files (*.xml)|*.xml",
+                Multiselect = true,
+
+            };
+
+            bool? result = dialog.ShowDialog();
+
+            if (result == true && dialog.FileNames.Length > 0)
+            {
+                foreach (string filename in dialog.FileNames)
+                {
+                    if (Profiles.GetProfile(filename) is ModProfile profile)
+                    {
+                        bool found = false;
+                        foreach(ModProfile existingProfile in Profiles.GetProfiles())
+                        {
+                            if(existingProfile.Name == profile.Name)
+                            {
+                                found = true; 
+                                break;
+                            }
+                        }
+
+                        if (!found)
+                        {
+                            Profiles.AddProfile(profile);
+                            ProfileSelectorControl.SelectedIndex = ProfileSelectorControl.Items.Add(profile);
+                        }
+                    }
+                }
             }
 
             e.Handled = true;
@@ -82,7 +112,7 @@ namespace LCModManager
             {
                 Profiles.DeleteProfile(profile);
 
-                RefreshProfiles();
+                ProfileSelectorControl.Items.Remove(profile);
 
                 ModList.Clear();
             }

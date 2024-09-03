@@ -2,6 +2,7 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
+using Microsoft.Win32;
 
 namespace LCModManager
 {
@@ -33,30 +34,26 @@ namespace LCModManager
                 ModList.Add(package);
             }
 
-            foreach(ModEntry mod in ModList) mod.GetMissingDependencies(ModList);
+            foreach(ModEntry mod in ModList) mod.ProcessDependencies(ModList);
 
 
         }
 
         private void AddPackage_Click(object sender, RoutedEventArgs e)
         {
-            // Create OpenFileDialog 
-            Microsoft.Win32.OpenFileDialog dlg = new()
+            OpenFileDialog dialog = new()
             {
-                // Set filter for file extension and default file extension 
                 DefaultExt = ".zip",
                 Filter = "ZIP Files (*.zip)|*.zip",
                 Multiselect = true,
                 
             };
 
-            // Display OpenFileDialog by calling ShowDialog method 
-            bool? result = dlg.ShowDialog();
+            bool? result = dialog.ShowDialog();
 
-            // Get the selected file name and display in a TextBox 
-            if (result != null && result != false && dlg.FileNames.Length != 0)
+            if (result == true && dialog.FileNames.Length > 0)
             {
-                foreach(var filename in dlg.FileNames)
+                foreach(string filename in dialog.FileNames)
                 {
                     PackageManager.AddPackage(filename);
                 }

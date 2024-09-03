@@ -14,6 +14,7 @@ namespace LCModManager
         public string? IconUri { get; set; }
         public string[]? Dependencies { get; set; }
         public string[]? MissingDependencies { get; set; }
+        public string[]? MismatchedDependencies { get; set; }
     }
 
     public class ModEntryBase : IModEntry
@@ -26,6 +27,7 @@ namespace LCModManager
         public string? IconUri { get; set; }
         public string[]? Dependencies { get; set; }
         public string[]? MissingDependencies { get; set; }
+        public string[]? MismatchedDependencies { get; set; }
 
         public ModEntryBase()
         {
@@ -37,7 +39,7 @@ namespace LCModManager
     public class ModEntry : ModEntryBase
     {
         public BitmapImage? Icon { get; set; }
-        public bool IsMissingDependencies
+        public bool HasMissingDependencies
         {
             get
             {
@@ -46,11 +48,29 @@ namespace LCModManager
             }
         }
 
-        public void GetMissingDependencies(IEnumerable<ModEntry> entries)
+        public bool HasMismatchedDependencies
+        {
+            get
+            {
+                if (MismatchedDependencies != null && MismatchedDependencies.Length > 0) return true;
+                else return false;
+            }
+        }
+        public bool HasIncompatibility
+        {
+            get
+            {
+                return HasMissingDependencies || HasMismatchedDependencies;
+            }
+        }
+
+
+        public void ProcessDependencies(IEnumerable<ModEntry> entries)
         {
             if (Dependencies != null)
             {
                 List<string> missingDeps = [];
+                List<string> mismatchedDeps = [];
 
                 foreach (string depStr in Dependencies)
                 {
@@ -59,14 +79,19 @@ namespace LCModManager
                     {
                         if (entry.Name != null && entry.Version != null)
                         {
-                            string pattern = entry.Name.Split("-")[0];
+                            string[] nameParts = depStr.Split("-");
 
                             //Pattern to match to end of depStr
-                            Regex reg = new(pattern);
+                            Regex reg = new(entry.Name);
 
                             //Check dependency string against regex
                             if (reg.IsMatch(depStr))
                             {
+                                if (nameParts[^1] != entry.Version)
+                                {
+                                    mismatchedDeps.Add(depStr);
+                                }
+
                                 found = true;
                                 break;
                             }
@@ -77,11 +102,12 @@ namespace LCModManager
                     if (!found) missingDeps.Add(depStr);
                 }
 
+                MismatchedDependencies = [.. mismatchedDeps];
                 MissingDependencies = [.. missingDeps];
             }
         }
 
-        public void GetMissingDependencies(IEnumerable<ModEntryBase> entries)
+        public void ProcessDependencies(IEnumerable<ModEntryBase> entries)
         {
             if (Dependencies != null)
             {
