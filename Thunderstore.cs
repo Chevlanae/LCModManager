@@ -33,7 +33,7 @@ namespace LCModManager
         {
             private string? _ReadMe;
             private string? _ChangeLog;
-            private ModManifest? _Manifest;
+            private ModManifest _Manifest;
 
             public string? ReadMe => _ReadMe;
             public string? ChangeLog => _ChangeLog;
@@ -75,30 +75,29 @@ namespace LCModManager
                 try
                 {
                     _Manifest = new ModManifest(File.ReadAllText(sourcePath + "\\manifest.json"), new(JsonSerializerDefaults.Web));
-                    Name = _Manifest.Value.Name ?? "";
-                    Description = _Manifest.Value.Description;
-                    Version = _Manifest.Value.Version_Number;
-                    Website = _Manifest.Value.Website_Url;
-                    Dependencies = _Manifest.Value.Dependencies;
+                    Name = _Manifest.Name ?? "";
+                    Description = _Manifest.Description;
+                    Version = _Manifest.Version_Number;
+                    Website = _Manifest.Website_Url;
+                    Dependencies = _Manifest.Dependencies;
                 } catch
                 {
+
                     throw new Exception("Could not serialize JSON manifest at: \"" + sourcePath + "\\manifest.json" + "\"");
                 }
             }
         }
 
-        static internal class PackageManager
+        static internal partial class PackageManager
         {
             static public string StorePath = AppConfig.PackageStorePath + "\\Thunderstore";
-
 
             static public void AddPackage(string packageSourcePath)
             {
 
                 string storeName = packageSourcePath.Split("\\").Last()[..^4];
 
-                Regex duplicateFilenameReg = new("\\([0-9]\\)$"); 
-                if (duplicateFilenameReg.IsMatch(storeName))
+                if (DuplicateFileRegex().IsMatch(storeName))
                 {
                     storeName = storeName[0..^3];
                 }
@@ -200,6 +199,75 @@ namespace LCModManager
                     }
                 }
                 return null;
+            }
+
+            [GeneratedRegex("\\([0-9]\\)\\.[a-zA-Z0-9]+$|\\([0-9][0-9]\\)\\.[a-zA-Z0-9]+$|\\([0-9][0-9][0-9]\\)\\.[a-zA-Z0-9]+$")]
+            private static partial Regex DuplicateFileRegex();
+        }
+
+        static internal class ModDeployer
+        {
+            static public string GameDir = GameDirectory.Find();
+
+            static public string InferModParentDirectory(ModEntry modEntry)
+            {
+
+                List<string> childDirs = [];
+
+                foreach (string dir in Directory.GetDirectories(modEntry.Path))
+                {
+                    childDirs.Add(dir.Split("\\")[^1]);
+                }
+
+                switch (childDirs.Count)
+                {
+                    case 0: return GameDir + "\\BepInEx\\plugins";
+                    case 1:
+                        return childDirs[0] switch
+                        {
+                            "BepInEx" => GameDir,
+                            "BepInExPack" => GameDir,
+                            _ => GameDir + "\\BepInEx\\",
+                        };
+                    default:
+                        foreach (string dir in childDirs)
+                        {
+                            switch (dir)
+                            {
+                                case "BepInEx": return GameDir;
+                            }
+                        }
+
+                        return GameDir + "\\BepInEx";
+                }
+            }
+
+            static public void DeployModFromStore(string name)
+            {
+                ModPackage? package = PackageManager.GetFromName(name);
+
+                if (package != null) DeployModFromStore(package);
+            }
+
+            static public void DeployModFromStore(ModEntry modEntry)
+            {
+                if (modEntry.Name == "BepInExPack")
+                {
+                    Utils.CopyDirectory(modEntry.Path + "\\BepInExPack", GameDir, true);
+                }
+                else
+                {
+                    string destinationPath = InferModParentDirectory(modEntry);
+
+                    Utils.CopyDirectory(modEntry.Path, destinationPath, true);
+                }
+            }
+
+            static public void RemoveDeployedMods()
+            {
+                if (Directory.Exists(GameDir + "\\BepInEx")) Directory.Delete(GameDir + "\\BepInEx", true);
+                if (File.Exists(GameDir + "\\doorstop_config.ini")) File.Delete(GameDir + "\\doorstop_config.ini");
+                if (File.Exists(GameDir + "\\winhttp.dll")) File.Delete(GameDir + "\\winhttp.dll");
             }
         }
 

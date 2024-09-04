@@ -1,4 +1,6 @@
-﻿using System.IO;
+﻿using LCModManager.Thunderstore;
+using System.IO;
+using System.IO.Packaging;
 using System.Text.RegularExpressions;
 using System.Windows.Media.Imaging;
 
@@ -162,29 +164,6 @@ namespace LCModManager
         static public string PackageStorePath = ResourcePath + "\\mods";
     }
 
-    static internal class GameDirectory
-    {
-        static public string substring = "steamapps\\common\\Lethal Company";
-        static public string? path = Find();
-
-        static public string? Find()
-        {
-            DriveInfo[] drives = DriveInfo.GetDrives();
-
-            List<string?> possiblePaths = [];
-
-            foreach (var item in drives) if (!item.Name.Contains('C')) possiblePaths.Add(Path.Combine(item.Name, "SteamLibrary\\", substring));
-
-            possiblePaths.Add(Path.Combine("C:\\Program Files (x86)\\Steam\\", substring));
-            possiblePaths.Add(Path.Combine("C:\\Program Files\\Steam\\", substring));
-
-            foreach (var item in possiblePaths) if (Directory.Exists(item)) return item;
-
-            return null;
-        }
-    }
-
-
     static internal class Utils
     {
 
@@ -219,6 +198,28 @@ namespace LCModManager
                     CopyDirectory(subDir.FullName, newDestinationDir, true);
                 }
             }
+        }
+    }
+
+    static internal class GameDirectory
+    {
+        static public string Substring = "steamapps\\common\\Lethal Company";
+
+        static public string Find()
+        {
+
+            DriveInfo[] drives = DriveInfo.GetDrives();
+
+            List<string?> possiblePaths = [];
+
+            foreach (var item in drives) if (!item.Name.Contains('C')) possiblePaths.Add(Path.Combine(item.Name, "SteamLibrary\\", Substring));
+
+            possiblePaths.Add(Path.Combine("C:\\Program Files (x86)\\Steam\\", Substring));
+            possiblePaths.Add(Path.Combine("C:\\Program Files\\Steam\\", Substring));
+
+            foreach (var item in possiblePaths) if (Directory.Exists(item)) return item;
+
+            throw new Exception("Could not find local Lethal Company game directory.");
         }
     }
 }

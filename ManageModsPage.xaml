@@ -6,6 +6,7 @@
       xmlns:local="clr-namespace:LCModManager"
       mc:Ignorable="d" 
       d:DesignHeight="1080" d:DesignWidth="1920"
+      x:Name="Mods"
       Title="ManageModsPage">
     <Grid>
         <ToolBar ToolBarTray.IsLocked="True" VerticalAlignment="Top" Height="40" FontSize="12" Grid.ColumnSpan="2">
@@ -15,7 +16,7 @@
             <Button x:Name="RemovePackage" Click="RemovePackage_Click" Style="{StaticResource ToolBarButton}">
                 <Image Height="16" Width="16" Source="/Resources/RedXIcon.png" ></Image>
             </Button>
-            <Button x:Name="WebPackage" Click="WebPackage_Click" Style="{StaticResource ToolBarButton}">
+            <Button x:Name="WebPackage" Click="WebPackage_Click" Style="{StaticResource ToolBarButton}" Visibility="Hidden">
                 <Image Height="16" Width="16" Source="/Resources/Web-Icon.png" ></Image>
             </Button>
         </ToolBar>

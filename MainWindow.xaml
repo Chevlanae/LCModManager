@@ -14,7 +14,13 @@
                 <ColumnDefinition Width="20" />
                 <ColumnDefinition Width="1*" />
             </Grid.ColumnDefinitions>
-            <Menu x:Name="RibbonMenu" Height="20" Grid.ColumnSpan="2" Background="FloralWhite" HorizontalAlignment="Left" VerticalAlignment="Top" RenderTransformOrigin="0,0">
+            <Menu x:Name="RibbonMenu"
+                  Height="20"
+                  Grid.ColumnSpan="2"
+                  Background="FloralWhite"
+                  HorizontalAlignment="Left"
+                  VerticalAlignment="Top"
+                  RenderTransformOrigin="0,0">
                 <Menu.RenderTransform>
                     <TransformGroup>
                         <ScaleTransform/>
@@ -23,8 +29,39 @@
                         <TranslateTransform X="20"/>
                     </TransformGroup>
                 </Menu.RenderTransform>
-                <MenuItem Header="Mods" Click="NavTo_ManageMods"/>
-                <MenuItem Header="Profiles" Click="NavTo_CreateProfile"/>
+                <MenuItem x:Name="ManageModsMenuItem" Header="Mods" Click="NavTo_ManageMods">
+                    <MenuItem.Style>
+                        <Style TargetType="MenuItem">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ElementName=ViewFrame, Path=Content.Name}" Value="Mods">
+                                    <Setter Property="Background" Value="LightGray" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </MenuItem.Style>
+                </MenuItem>
+                <MenuItem x:Name="CreateProfileMenuItem" Header="Profiles" Click="NavTo_CreateProfile">
+                    <MenuItem.Style>
+                        <Style TargetType="MenuItem">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ElementName=ViewFrame, Path=Content.Name}" Value="Profiles">
+                                    <Setter Property="Background" Value="LightGray" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </MenuItem.Style>
+                </MenuItem>
+                <MenuItem x:Name="LauncherMenuItem" Header="Launcher" Click="NavTo_Launcher">
+                    <MenuItem.Style>
+                        <Style TargetType="MenuItem">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ElementName=ViewFrame, Path=Content.Name}" Value="Launcher">
+                                    <Setter Property="Background" Value="LightGray" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </MenuItem.Style>
+                </MenuItem>
             </Menu>
             <Frame x:Name="ViewFrame" Grid.Column="1" NavigationUIVisibility="Hidden"/>
         </Grid>

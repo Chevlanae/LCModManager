@@ -21,7 +21,7 @@ namespace LCModManager
 
             RefreshModList();
 
-            foreach (ModProfile profile in Profiles.GetProfiles())
+            foreach (ModProfile profile in ProfileManager.GetProfiles())
             {
                 ProfileSelectorControl.Items.Add(profile);
             }
@@ -57,7 +57,7 @@ namespace LCModManager
 
                 if (!ProfileSelectorControl.Items.Contains(newProfile))
                 {
-                    Profiles.AddProfile(newProfile);
+                    ProfileManager.AddProfile(newProfile);
 
                     ProfileSelectorControl.SelectedIndex = ProfileSelectorControl.Items.Add(newProfile);
                 }
@@ -82,10 +82,10 @@ namespace LCModManager
             {
                 foreach (string filename in dialog.FileNames)
                 {
-                    if (Profiles.GetProfile(filename) is ModProfile profile)
+                    if (ProfileManager.GetProfile(filename) is ModProfile profile)
                     {
                         bool found = false;
-                        foreach(ModProfile existingProfile in Profiles.GetProfiles())
+                        foreach(ModProfile existingProfile in ProfileManager.GetProfiles())
                         {
                             if(existingProfile.Name == profile.Name)
                             {
@@ -96,7 +96,7 @@ namespace LCModManager
 
                         if (!found)
                         {
-                            Profiles.AddProfile(profile);
+                            ProfileManager.AddProfile(profile);
                             ProfileSelectorControl.SelectedIndex = ProfileSelectorControl.Items.Add(profile);
                         }
                     }
@@ -110,7 +110,7 @@ namespace LCModManager
         {
             if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
-                Profiles.DeleteProfile(profile);
+                ProfileManager.DeleteProfile(profile);
 
                 ProfileSelectorControl.Items.Remove(profile);
 
@@ -145,7 +145,7 @@ namespace LCModManager
                         }
                     }
 
-                    Profiles.SaveProfile(profile);
+                    ProfileManager.SaveProfile(profile);
 
                     RefreshModList();
                 }

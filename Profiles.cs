@@ -23,8 +23,8 @@ namespace LCModManager
             {
                 if (value is string name)
                 {
-                    string path = Profiles.StorePath + "\\" + name + ".xml";
-                    ModProfile? profile = Profiles.GetProfile(path);
+                    string path = ProfileManager.StorePath + "\\" + name + ".xml";
+                    ModProfile? profile = ProfileManager.GetProfile(path);
 
                     if (profile != null) return profile;
                     else return new ModProfile();
@@ -147,7 +147,7 @@ namespace LCModManager
         }
     }
 
-    static internal class Profiles
+    static internal class ProfileManager
     {
         static public string StorePath = AppConfig.ResourcePath + "\\profiles";
 
