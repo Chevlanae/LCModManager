@@ -10,29 +10,29 @@ namespace LCModManager
     /// </summary>
     public partial class AddModsDialog : Window
     {
-        public ObservableCollection<ModEntry> ModList = [];
+        public ObservableCollection<ModEntryDisplay> ModList = [];
 
         public AddModsDialog()
         {
             InitializeComponent();
 
-            foreach (ModEntry package in PackageManager.GetPackages()) ModList.Add(package);
+            foreach (ModEntryDisplay package in PackageManager.GetPackages()) ModList.Add(package);
 
             ModListControl.ItemsSource = ModList;
         }
 
-        public AddModsDialog(IList<ModEntry> existingEntries)
+        public AddModsDialog(IList<ModEntryDisplay> existingEntries)
         {
             InitializeComponent();
 
             ModList = [];
 
-            foreach (ModEntry package in PackageManager.GetPackages())
+            foreach (ModEntryDisplay package in PackageManager.GetPackages())
             {
 
                 //skip existing entries
                 bool found = false;
-                foreach (ModEntry entry in existingEntries)
+                foreach (ModEntryDisplay entry in existingEntries)
                 {
                     if (package.Name == entry.Name)
                     {

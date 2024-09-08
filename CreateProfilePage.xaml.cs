@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Text.RegularExpressions;
 using LCModManager.Thunderstore;
 using Microsoft.Win32;
 
@@ -11,7 +12,7 @@ namespace LCModManager
     /// </summary>
     public partial class CreateProfilePage : Page
     {
-        public ObservableCollection<ModEntry> ModList = [];
+        public ObservableCollection<ModEntryDisplay> ModList = [];
 
         public CreateProfilePage()
         {
@@ -19,12 +20,12 @@ namespace LCModManager
 
             ModListControl.ItemsSource = ModList;
 
-            RefreshModList();
-
             foreach (ModProfile profile in ProfileManager.GetProfiles())
             {
                 ProfileSelectorControl.Items.Add(profile);
             }
+
+            RefreshModList();
         }
 
         private void RefreshModList()
@@ -33,14 +34,17 @@ namespace LCModManager
             {
                 ModList.Clear();
 
-                foreach (ModEntryBase entry in profile.ModList)
+                foreach (ModEntry entry in profile.ModList)
                 {
-                    ModEntry? mod = PackageManager.GetFromName(entry.Name);
+                    Regex entryRegex = new (entry.Name + "-" + entry.Version.Replace(".", "\\."));
 
-                    if(mod != null) ModList.Add(mod);
+                    foreach (ModEntryDisplay mod in PackageManager.GetPackages(entryRegex))
+                    {
+                        ModList.Add(mod);
+                    }
                 }
 
-                foreach (ModEntry mod in ModList)
+                foreach (ModEntryDisplay mod in ModList)
                 {
                     mod.ProcessDependencies(ModList);
                 }
@@ -135,11 +139,11 @@ namespace LCModManager
                 {
                     foreach (var package in dialog.ModListControl.SelectedItems)
                     {
-                        if (package is ModEntry modEntry)
+                        if (package is ModEntryDisplay modEntry)
                         {
-                            profile.Add(modEntry.ToModEntryBase());
+                            profile.Add(modEntry.ToModEntry());
                         }
-                        else if(package is ModEntryBase modEntryBase)
+                        else if(package is ModEntry modEntryBase)
                         {
                             profile.Add(modEntryBase);
                         }
@@ -158,23 +162,13 @@ namespace LCModManager
         {
             if(ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
-                List<ModEntry> items = [];
 
-                foreach (var entry in ModListControl.SelectedItems)
+                foreach (ModEntry entry in ModListControl.SelectedItems)
                 {
-                    if(entry is ModPackage modPackage)
-                    {
-                        items.Add(modPackage);
-                    }
+                    profile.ModList.RemoveAll(e => e.Name == entry.Name && e.Version == entry.Version);
                 }
 
-                foreach (var package in items)
-                {
-                    if(package is ModEntry modEntry)
-                    {
-                        profile.RemoveAll(x => x.Name == modEntry.Name);
-                    }
-                }
+                ProfileManager.SaveProfile(profile);
 
                 RefreshModList();
             }

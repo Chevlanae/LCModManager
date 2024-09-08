@@ -83,6 +83,16 @@ namespace LCModManager.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Byte[].
         /// </summary>
+        internal static byte[] LCGameIcon {
+            get {
+                object obj = ResourceManager.GetObject("LCGameIcon", resourceCulture);
+                return ((byte[])(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Byte[].
+        /// </summary>
         internal static byte[] Red_X {
             get {
                 object obj = ResourceManager.GetObject("Red_X", resourceCulture);

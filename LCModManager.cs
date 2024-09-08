@@ -1,4 +1,5 @@
 ﻿using LCModManager.Thunderstore;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Packaging;
 using System.Text.RegularExpressions;
@@ -6,6 +7,26 @@ using System.Windows.Media.Imaging;
 
 namespace LCModManager
 {
+
+    static internal class AppConfig
+    {
+        static public class PackageStorePaths
+        {
+            static public string Thunderstore = PackageStorePath + "\\Thunderstore";
+        }
+
+        static public string ResourcePath = Environment.GetEnvironmentVariable("APPDATA") + "\\LCModManager";
+        static public string PackageStorePath = ResourcePath + "\\mods";
+        static public string ProfileStorePath = AppConfig.ResourcePath + "\\profiles";
+
+        static public void CreateDataStores()
+        {
+            if (!Directory.Exists(PackageStorePath)) Directory.CreateDirectory(PackageStorePath);
+            if (!Directory.Exists(ProfileStorePath)) Directory.CreateDirectory(ProfileStorePath);
+            if (!Directory.Exists(PackageStorePaths.Thunderstore)) Directory.CreateDirectory(PackageStorePaths.Thunderstore);
+        }
+    }
+
     public interface IModEntry
     {
         public string Path { get; set; }
@@ -19,10 +40,10 @@ namespace LCModManager
         public string[]? MismatchedDependencies { get; set; }
     }
 
-    public class ModEntryBase : IModEntry
+    public class ModEntry : IModEntry
     {
-        public string Path { get; set; }
-        public string Name { get; set; }
+        public string Path { get; set; } = "";
+        public string Name { get; set; } = "";
         public string? Description { get; set; }
         public string? Version { get; set; }
         public string? Website { get; set; }
@@ -30,15 +51,9 @@ namespace LCModManager
         public string[]? Dependencies { get; set; }
         public string[]? MissingDependencies { get; set; }
         public string[]? MismatchedDependencies { get; set; }
-
-        public ModEntryBase()
-        {
-            Path = "";
-            Name = "";
-        }
     }
 
-    public class ModEntry : ModEntryBase
+    public class ModEntryDisplay : ModEntry
     {
         public BitmapImage? Icon { get; set; }
         public bool HasMissingDependencies
@@ -58,6 +73,7 @@ namespace LCModManager
                 else return false;
             }
         }
+
         public bool HasIncompatibility
         {
             get
@@ -65,7 +81,6 @@ namespace LCModManager
                 return HasMissingDependencies || HasMismatchedDependencies;
             }
         }
-
 
         public void ProcessDependencies(IEnumerable<ModEntry> entries)
         {
@@ -76,22 +91,29 @@ namespace LCModManager
 
                 foreach (string depStr in Dependencies)
                 {
+                    string[] EdepStr = depStr.Split("-");
+                    string depStrName = EdepStr[^2];
+                    string depStrVersion = EdepStr[^1];
                     bool found = false;
+
                     foreach (ModEntry entry in entries)
                     {
                         if (entry.Name != null && entry.Version != null)
                         {
-                            string[] nameParts = depStr.Split("-");
-
-                            //Pattern to match to end of depStr
-                            Regex reg = new(entry.Name);
 
                             //Check dependency string against regex
-                            if (reg.IsMatch(depStr))
+                            if (entry.Name == depStrName)
                             {
-                                if (nameParts[^1] != entry.Version)
+                                if(entry.Version != depStrVersion) 
                                 {
                                     mismatchedDeps.Add(depStr);
+                                }
+                                else
+                                {
+                                    foreach (string str in mismatchedDeps)
+                                    {
+                                        if (str.Split("-")[^2] == depStrName) mismatchedDeps.Remove(str);
+                                    }
                                 }
 
                                 found = true;
@@ -109,42 +131,9 @@ namespace LCModManager
             }
         }
 
-        public void ProcessDependencies(IEnumerable<ModEntryBase> entries)
+        public ModEntry ToModEntry()
         {
-            if (Dependencies != null)
-            {
-                List<string> missingDeps = [];
-
-                foreach (string depStr in Dependencies)
-                {
-                    bool found = false;
-                    foreach (ModEntryBase entry in entries)
-                    {
-                        if (entry.Name != null && entry.Version != null)
-                        {
-                            string nameSubStr = entry.Name;
-                            string depSubStr = depStr.Split("-")[^2];
-
-                            //Check dependency string against regex
-                            if (nameSubStr == depSubStr)
-                            {
-                                found = true;
-                                break;
-                            }
-                        }
-
-                    }
-
-                    if (!found) missingDeps.Add(depStr);
-                }
-
-                MissingDependencies = [.. missingDeps];
-            }
-        }
-
-        public ModEntryBase ToModEntryBase()
-        {
-            return new ModEntryBase
+            return new ModEntry
             {
                 Path = Path,
                 Name = Name,
@@ -158,15 +147,8 @@ namespace LCModManager
         }
     }
 
-    static internal class AppConfig
-    {
-        static public string ResourcePath = Environment.GetEnvironmentVariable("APPDATA") + "\\LCModManager";
-        static public string PackageStorePath = ResourcePath + "\\mods";
-    }
-
     static internal class Utils
     {
-
         static public void CopyDirectory(string sourceDir, string destinationDir, bool recursive)
         {
             // Get information about the source directory
@@ -205,7 +187,7 @@ namespace LCModManager
     {
         static public string Substring = "steamapps\\common\\Lethal Company";
 
-        static public string Find()
+        static public string? Find()
         {
 
             DriveInfo[] drives = DriveInfo.GetDrives();
@@ -219,7 +201,8 @@ namespace LCModManager
 
             foreach (var item in possiblePaths) if (Directory.Exists(item)) return item;
 
-            throw new Exception("Could not find local Lethal Company game directory.");
+            Debug.Write("Could not find local Lethal Company game directory.");
+            return null;
         }
     }
 }

@@ -12,7 +12,8 @@ namespace LCModManager
     {
         public App()
         {
-            if (!Directory.Exists(Thunderstore.PackageManager.StorePath)) Directory.CreateDirectory(Thunderstore.PackageManager.StorePath);
+            AppConfig.CreateDataStores();
+            var test = Thunderstore.WebAPI.GetPackageList();
         }
 
         private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)

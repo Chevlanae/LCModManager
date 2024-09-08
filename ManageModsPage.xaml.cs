@@ -11,7 +11,7 @@ namespace LCModManager
     /// </summary>
     partial class ManageModsPage : Page
     {
-        public ObservableCollection<ModEntry> ModList;
+        public ObservableCollection<ModEntryDisplay> ModList;
 
         public ManageModsPage()
         {
@@ -29,12 +29,12 @@ namespace LCModManager
         {
             ModList.Clear();
 
-            foreach (ModEntry package in PackageManager.GetPackages())
+            foreach (ModEntryDisplay package in PackageManager.GetPackages())
             {
                 ModList.Add(package);
             }
 
-            foreach(ModEntry mod in ModList) mod.ProcessDependencies(ModList);
+            foreach(ModEntryDisplay mod in ModList) mod.ProcessDependencies(ModList);
 
 
         }
@@ -49,9 +49,7 @@ namespace LCModManager
                 
             };
 
-            bool? result = dialog.ShowDialog();
-
-            if (result == true && dialog.FileNames.Length > 0)
+            if (dialog.ShowDialog() == true && dialog.FileNames.Length > 0)
             {
                 foreach(string filename in dialog.FileNames)
                 {

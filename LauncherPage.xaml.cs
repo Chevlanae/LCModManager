@@ -1,5 +1,6 @@
 ﻿using LCModManager.Thunderstore;
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -27,27 +28,24 @@ namespace LCModManager
             }
         }
 
-        private void LaunchGame_Click(object sender, RoutedEventArgs e)
+        async private void LaunchGame_Click(object sender, RoutedEventArgs e)
         {
-            if(ProfileSelectorControl.SelectedItem is ModProfile profile)
+            ModProfile profile = ProfileSelectorControl.SelectedItem as ModProfile;
+
+            await ModDeployer.DeployProfile(profile);
+
+            string? gameDir = GameDirectory.Find();
+
+            if(gameDir != null)
             {
-                foreach(ModEntryBase modEntry in profile.ModList)
-                {
-                    if(PackageManager.GetFromName(modEntry.Name) is ModPackage package)
-                    {
-                        ModDeployer.DeployModFromStore(package);
-                    }
-                }
+                ProcessStartInfo info = new(gameDir + "\\Lethal Company.exe");
 
+                Process? process = Process.Start(info);
+
+                process?.WaitForExit();
+
+                ModDeployer.ExfiltrateProfile(profile);
             }
-
-            ProcessStartInfo info = new(GameDirectory.Find() + "\\Lethal Company.exe");
-
-            Process? process = Process.Start(info);
-
-            process?.WaitForExit();
-
-            ModDeployer.RemoveDeployedMods();
         }
     }
 }

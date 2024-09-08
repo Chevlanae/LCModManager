@@ -23,7 +23,7 @@ namespace LCModManager
             {
                 if (value is string name)
                 {
-                    string path = ProfileManager.StorePath + "\\" + name + ".xml";
+                    string path = AppConfig.ProfileStorePath + "\\" + name + ".xml";
                     ModProfile? profile = ProfileManager.GetProfile(path);
 
                     if (profile != null) return profile;
@@ -37,14 +37,14 @@ namespace LCModManager
     public class ModProfile
     {
 
-        public List<ModEntryBase> ModList = [];
+        public List<ModEntry> ModList = [];
 
         public string Name { get; set; }
 
         public int Count => ModList.Count;
 
 
-        public ModEntryBase this[int index] 
+        public ModEntry this[int index] 
         { 
             get
             {
@@ -52,9 +52,9 @@ namespace LCModManager
             }
             set
             {
-                if( value is ModEntry modEntry)
+                if( value is ModEntryDisplay modEntry)
                 {
-                    ModList[index] = modEntry.ToModEntryBase();
+                    ModList[index] = modEntry.ToModEntry();
                 }
                 else
                 {
@@ -74,12 +74,12 @@ namespace LCModManager
             Name = name;
         }
 
-        public ModProfile(string name, IEnumerable<ModEntryBase> modList)
+        public ModProfile(string name, IEnumerable<ModEntry> modList)
         {
             Name = name;
 
             int i = 0;
-            foreach(ModEntryBase mod in modList)
+            foreach(ModEntry mod in modList)
             {
                 this[i] = mod;
                 i++;
@@ -91,12 +91,12 @@ namespace LCModManager
             return Name;
         }
 
-        public int IndexOf(ModEntryBase item)
+        public int IndexOf(ModEntry item)
         {
             return ModList.IndexOf(item);
         }
 
-        public void Insert(int index, ModEntryBase item)
+        public void Insert(int index, ModEntry item)
         {
             ModList.Insert(index, item);
         }
@@ -106,22 +106,22 @@ namespace LCModManager
             ModList.RemoveAt(index);
         }
 
-        internal void RemoveAll(Func<ModEntryBase, bool> value)
+        internal void RemoveAll(Func<ModEntry, bool> value)
         {
-            List<ModEntryBase> removedItems = [];
+            List<ModEntry> removedItems = [];
 
-            foreach(ModEntryBase item in ModList)
+            foreach(ModEntry item in ModList)
             {
                 if (value(item)) removedItems.Add(item);
             }
 
-            foreach(ModEntryBase item in removedItems)
+            foreach(ModEntry item in removedItems)
             {
                 ModList.Remove(item);
             }
         }
 
-        public void Add(ModEntryBase item)
+        public void Add(ModEntry item)
         {
             ModList.Add(item);
         }
@@ -131,17 +131,17 @@ namespace LCModManager
             ModList.Clear();
         }
 
-        public bool Contains(ModEntryBase item)
+        public bool Contains(ModEntry item)
         {
             return ModList.Contains(item);
         }
 
-        public void CopyTo(ModEntryBase[] array, int arrayIndex)
+        public void CopyTo(ModEntry[] array, int arrayIndex)
         {
             ModList.CopyTo(array, arrayIndex);
         }
 
-        public bool Remove(ModEntryBase item)
+        public bool Remove(ModEntry item)
         {
             return ModList.Remove(item);
         }
@@ -149,8 +149,6 @@ namespace LCModManager
 
     static internal class ProfileManager
     {
-        static public string StorePath = AppConfig.ResourcePath + "\\profiles";
-
         static public ModProfile? GetProfile(string path)
         {
             if (path[^4..^0].ToString() == ".xml")
@@ -184,11 +182,9 @@ namespace LCModManager
 
         static public List<ModProfile> GetProfiles()
         {
-            if (!Directory.Exists(StorePath)) Directory.CreateDirectory(StorePath);
-
             List<ModProfile> list = [];
 
-            foreach (string file in Directory.GetFiles(StorePath))
+            foreach (string file in Directory.GetFiles(AppConfig.ProfileStorePath))
             {
                 if (GetProfile(file) is ModProfile profile) list.Add(profile);
             }
@@ -198,12 +194,11 @@ namespace LCModManager
 
         static public void AddProfile(ModProfile newProfile)
         {
-            if (!Directory.Exists(StorePath)) Directory.CreateDirectory(StorePath);
-            string path = StorePath + "\\" + newProfile.Name + ".xml";
+            string path = AppConfig.ProfileStorePath + "\\" + newProfile.Name + ".xml";
 
             if (!File.Exists(path))
             {
-                using Stream newFile = File.Create(StorePath + "\\" + newProfile.Name + ".xml");
+                using Stream newFile = File.Create(AppConfig.ProfileStorePath + "\\" + newProfile.Name + ".xml");
 
                 XmlSerializer x = new(newProfile.GetType());
 
@@ -216,12 +211,12 @@ namespace LCModManager
 
         static public void SaveProfile(ModProfile profile)
         {
-            if (!Directory.Exists(StorePath)) Directory.CreateDirectory(StorePath);
-            string path = StorePath + "\\" + profile.Name + ".xml";
+            string dirPath = AppConfig.ProfileStorePath + "\\" + profile.Name;
+            string filePath = dirPath + ".xml";
 
-            if (File.Exists(path))
+            if (File.Exists(filePath))
             {
-                using Stream file = File.OpenWrite(path);
+                using Stream file = File.Create(filePath);
                 XmlSerializer x = new(profile.GetType());
 
                 x.Serialize(file, profile);
@@ -229,12 +224,13 @@ namespace LCModManager
                 file.Close();
                 file.Dispose();
             }
+
+            if (Directory.Exists(dirPath)) Directory.Delete(dirPath, true);
         }
 
         static public void DeleteProfile(ModProfile profile)
         {
-            if (!Directory.Exists(StorePath)) Directory.CreateDirectory(StorePath);
-            string path = StorePath + "\\" + profile.Name + ".xml";
+            string path = AppConfig.ProfileStorePath + "\\" + profile.Name + ".xml";
 
             if (File.Exists(path)) File.Delete(path);
         }
