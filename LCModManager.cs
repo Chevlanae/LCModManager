@@ -17,133 +17,15 @@ namespace LCModManager
 
         static public string ResourcePath = Environment.GetEnvironmentVariable("APPDATA") + "\\LCModManager";
         static public string PackageStorePath = ResourcePath + "\\mods";
-        static public string ProfileStorePath = AppConfig.ResourcePath + "\\profiles";
+        static public string ProfileStorePath = ResourcePath + "\\profiles";
+        static public string DownloadStorePath = ResourcePath + "\\downloads";
 
         static public void CreateDataStores()
         {
             if (!Directory.Exists(PackageStorePath)) Directory.CreateDirectory(PackageStorePath);
             if (!Directory.Exists(ProfileStorePath)) Directory.CreateDirectory(ProfileStorePath);
+            if (!Directory.Exists(DownloadStorePath)) Directory.CreateDirectory(DownloadStorePath);
             if (!Directory.Exists(PackageStorePaths.Thunderstore)) Directory.CreateDirectory(PackageStorePaths.Thunderstore);
-        }
-    }
-
-    public interface IModEntry
-    {
-        public string Path { get; set; }
-        public string Name { get; set; }
-        public string? Description { get; set; }
-        public string? Version { get; set; }
-        public string? Website { get; set; }
-        public string? IconUri { get; set; }
-        public string[]? Dependencies { get; set; }
-        public string[]? MissingDependencies { get; set; }
-        public string[]? MismatchedDependencies { get; set; }
-    }
-
-    public class ModEntry : IModEntry
-    {
-        public string Path { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string? Description { get; set; }
-        public string? Version { get; set; }
-        public string? Website { get; set; }
-        public string? IconUri { get; set; }
-        public string[]? Dependencies { get; set; }
-        public string[]? MissingDependencies { get; set; }
-        public string[]? MismatchedDependencies { get; set; }
-    }
-
-    public class ModEntryDisplay : ModEntry
-    {
-        public BitmapImage? Icon { get; set; }
-        public bool HasMissingDependencies
-        {
-            get
-            {
-                if (MissingDependencies != null && MissingDependencies.Length > 0) return true;
-                else return false;
-            }
-        }
-
-        public bool HasMismatchedDependencies
-        {
-            get
-            {
-                if (MismatchedDependencies != null && MismatchedDependencies.Length > 0) return true;
-                else return false;
-            }
-        }
-
-        public bool HasIncompatibility
-        {
-            get
-            {
-                return HasMissingDependencies || HasMismatchedDependencies;
-            }
-        }
-
-        public void ProcessDependencies(IEnumerable<ModEntry> entries)
-        {
-            if (Dependencies != null)
-            {
-                List<string> missingDeps = [];
-                List<string> mismatchedDeps = [];
-
-                foreach (string depStr in Dependencies)
-                {
-                    string[] EdepStr = depStr.Split("-");
-                    string depStrName = EdepStr[^2];
-                    string depStrVersion = EdepStr[^1];
-                    bool found = false;
-
-                    foreach (ModEntry entry in entries)
-                    {
-                        if (entry.Name != null && entry.Version != null)
-                        {
-
-                            //Check dependency string against regex
-                            if (entry.Name == depStrName)
-                            {
-                                if(entry.Version != depStrVersion) 
-                                {
-                                    mismatchedDeps.Add(depStr);
-                                }
-                                else
-                                {
-                                    foreach (string str in mismatchedDeps)
-                                    {
-                                        if (str.Split("-")[^2] == depStrName) mismatchedDeps.Remove(str);
-                                    }
-                                }
-
-                                found = true;
-                                break;
-                            }
-                        }
-
-                    }
-
-                    if (!found) missingDeps.Add(depStr);
-                }
-
-                MismatchedDependencies = [.. mismatchedDeps];
-                MissingDependencies = [.. missingDeps];
-            }
-        }
-
-        public ModEntry ToModEntry()
-        {
-            return new ModEntry
-            {
-                Path = Path,
-                Name = Name,
-                Description = Description,
-                Version = Version,
-                Website = Website,
-                IconUri = IconUri,
-                Dependencies = Dependencies,
-                MissingDependencies = MissingDependencies
-            };
         }
     }
 
@@ -203,6 +85,126 @@ namespace LCModManager
 
             Debug.Write("Could not find local Lethal Company game directory.");
             return null;
+        }
+    }
+
+    public interface IModEntry
+    {
+        public string Path { get; set; }
+        public string Name { get; set; }
+        public string? Description { get; set; }
+        public string? Version { get; set; }
+        public string? Website { get; set; }
+        public string? IconUri { get; set; }
+        public string[]? Dependencies { get; set; }
+        public string[]? MissingDependencies { get; set; }
+        public string[]? MismatchedDependencies { get; set; }
+    }
+
+    public class ModEntry : IModEntry
+    {
+        public string Path { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string? Description { get; set; }
+        public string? Version { get; set; }
+        public string? Website { get; set; }
+        public string? IconUri { get; set; }
+        public string[]? Dependencies { get; set; }
+        public string[]? MissingDependencies { get; set; }
+        public string[]? MismatchedDependencies { get; set; }
+    }
+
+    public class ModEntryDisplay : ModEntry
+    {
+        public BitmapImage? Icon { get; set; }
+        public bool HasMissingDependencies
+        {
+            get
+            {
+                if (MissingDependencies != null && MissingDependencies.Length > 0) return true;
+                else return false;
+            }
+        }
+
+        public bool HasMismatchedDependencies
+        {
+            get
+            {
+                if (MismatchedDependencies != null && MismatchedDependencies.Length > 0) return true;
+                else return false;
+            }
+        }
+
+        public bool HasIncompatibility
+        {
+            get
+            {
+                return HasMissingDependencies || HasMismatchedDependencies;
+            }
+        }
+
+        public bool ExistsInPackageStore = false;
+
+        public void ProcessDependencies(IEnumerable<ModEntry> entries)
+        {
+            if (Dependencies != null)
+            {
+                List<string> missingDeps = [];
+                List<string> mismatchedDeps = [];
+
+                foreach (string depStr in Dependencies)
+                {
+                    string[] EdepStr = depStr.Split("-");
+                    string depStrName = EdepStr[^2];
+                    string depStrVersion = EdepStr[^1];
+                    bool found = false;
+
+                    foreach (ModEntry entry in entries)
+                    {
+                        if (entry.Name != null && entry.Version != null)
+                        {
+                            //Check dependency string against regex.
+                            if (entry.Name == depStrName)
+                            {
+                                if(entry.Version == depStrVersion) 
+                                {
+                                    foreach (string str in mismatchedDeps)
+                                    {
+                                        //Remove mismatched dependency if matching version found.
+                                        if (str.Split("-")[^2] == depStrName) mismatchedDeps.Remove(str);
+                                    }
+                                    
+                                }
+
+                                else mismatchedDeps.Add(depStr);
+
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!found) missingDeps.Add(depStr);
+                }
+
+                MismatchedDependencies = [.. mismatchedDeps];
+                MissingDependencies = [.. missingDeps];
+            }
+        }
+
+        public ModEntry ToModEntry()
+        {
+            return new ModEntry
+            {
+                Path = Path,
+                Name = Name,
+                Description = Description,
+                Version = Version,
+                Website = Website,
+                IconUri = IconUri,
+                Dependencies = Dependencies,
+                MissingDependencies = MissingDependencies
+            };
         }
     }
 }

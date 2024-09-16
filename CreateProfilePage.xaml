@@ -71,9 +71,23 @@
             </Button>
         </ToolBar>
         <DataGrid x:Name="ModListControl"
-      GridLinesVisibility="Horizontal" 
-      Margin="0,40,0,0"  
-      Style="{StaticResource DataGridStyle}">
+              GridLinesVisibility="Horizontal" 
+              Margin="0,40,0,0"  
+              Style="{StaticResource DataGridStyle}">
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Setter Property="Background" Value="Transparent" />
+                    <Setter Property="BorderBrush" Value="Transparent" />
+                    <Setter Property="BorderThickness" Value="0" />
+                    <Setter Property="MinHeight" Value="64" />
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="LightBlue" />
+                            <Setter Property="BorderBrush" Value="Transparent" />
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
             <DataGrid.Resources>
                 <Style x:Key="{x:Type DataGridCell}" TargetType="{x:Type DataGridCell}">
                     <Setter Property="Background" Value="Transparent" />
@@ -84,18 +98,6 @@
                             <Setter Property="Background" Value="Transparent" />
                             <Setter Property="BorderBrush" Value="Transparent" />
                             <Setter Property="Foreground" Value="Black"/>
-                        </Trigger>
-                    </Style.Triggers>
-                </Style>
-                <Style TargetType="{x:Type DataGridRow}">
-                    <Setter Property="Background" Value="Transparent" />
-                    <Setter Property="BorderBrush" Value="Transparent" />
-                    <Setter Property="BorderThickness" Value="0" />
-                    <Setter Property="MinHeight" Value="64" />
-                    <Style.Triggers>
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Background" Value="LightBlue" />
-                            <Setter Property="BorderBrush" Value="Transparent" />
                         </Trigger>
                     </Style.Triggers>
                 </Style>
@@ -202,14 +204,14 @@
                         <TextBlock Text="Name" />
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
-                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Description}" MinWidth="300"  Width="*">
-                    <DataGridTextColumn.Header>
-                        <TextBlock Text="Description" />
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
                 <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Version}" MinWidth="70">
                     <DataGridTextColumn.Header>
                         <TextBlock Text="Version" />
+                    </DataGridTextColumn.Header>
+                </DataGridTextColumn>
+                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Description}" MinWidth="300"  Width="*">
+                    <DataGridTextColumn.Header>
+                        <TextBlock Text="Description" />
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
                 <DataGridHyperlinkColumn ElementStyle="{StaticResource HyperlinkTextBlock}" Header="Website" Binding="{Binding Path=Website}" MinWidth="64">

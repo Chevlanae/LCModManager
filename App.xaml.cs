@@ -1,7 +1,10 @@
 ﻿using System.Diagnostics;
 using System.IO;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Navigation;
+
+using LCModManager.Thunderstore;
 
 namespace LCModManager
 {
@@ -12,8 +15,9 @@ namespace LCModManager
     {
         public App()
         {
+            Regex bep = new("BepInEx");
+
             AppConfig.CreateDataStores();
-            var test = Thunderstore.WebAPI.GetPackageList();
         }
 
         private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)

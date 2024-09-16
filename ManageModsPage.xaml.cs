@@ -91,5 +91,32 @@ namespace LCModManager
             RefreshModList();
             e.Handled = true;
         }
+
+        async private void ResolveDependencies_Click(object sender, RoutedEventArgs e)
+        {
+            
+
+            foreach(ModEntry entry in ModList)
+            {
+                PackageListing? query = await WebClient.SearchPackageList(p => p.name == entry.Name);
+
+                if (query != null)
+                {
+                    foreach (PackageListingVersionEntry v in query.Value.versions)
+                    {
+                        if(v.version_number == entry.Version)
+                        {
+                            string? downloadPath = await WebClient.DownloadPackage(v);
+                            if (downloadPath != null)
+                            {
+                                PackageManager.AddPackage(downloadPath);
+                            }
+                        }
+                    }
+                }
+            }
+
+            RefreshModList();
+        }
     }
 }

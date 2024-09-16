@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Text.RegularExpressions;
 using LCModManager.Thunderstore;
 using Microsoft.Win32;
+using System.IO;
 
 namespace LCModManager
 {
@@ -36,11 +37,13 @@ namespace LCModManager
 
                 foreach (ModEntry entry in profile.ModList)
                 {
-                    Regex entryRegex = new (entry.Name + "-" + entry.Version.Replace(".", "\\."));
-
-                    foreach (ModEntryDisplay mod in PackageManager.GetPackages(entryRegex))
+                    if (Directory.Exists(entry.Path))
                     {
-                        ModList.Add(mod);
+                        ModList.Add(new ModPackage(entry.Path));
+                    }
+                    else
+                    {
+                        ModList.Add(new ModPackage(entry, true));
                     }
                 }
 
