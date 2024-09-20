@@ -300,10 +300,11 @@ namespace LCModManager
                 while (!File.Exists(GameDir + "\\" + "doorstop_config.ini")) await Task.Delay(100);
 
                 string bepinexDir = GameDir + "\\BepInEx";
-                foreach (string path in Directory.GetFiles(bepinexDir, "icon.png", SearchOption.AllDirectories)) File.Delete(path);
-                foreach (string path in Directory.GetFiles(bepinexDir, "manifest.json", SearchOption.AllDirectories)) File.Delete(path);
-                foreach (string path in Directory.GetFiles(bepinexDir, "README.md", SearchOption.AllDirectories)) File.Delete(path);
-                foreach (string path in Directory.GetFiles(bepinexDir, "CHANGELOG.md", SearchOption.AllDirectories)) File.Delete(path);
+                string[] filenames = ["icon.png", "manifest.json", "README.md", "CHANGELOG.md"];
+                foreach (string filename in filenames)
+                {
+                    foreach (string path in Directory.GetFiles(bepinexDir, filename, SearchOption.AllDirectories)) File.Delete(path);
+                }
             }
 
             static public void ExfiltrateProfile(ModProfile profile)
@@ -355,7 +356,7 @@ namespace LCModManager
 
         static internal class WebClient
         {
-            static private string PackageListCache = PackageManager.StorePath + "\\WebPackageListCache.json";
+            static public string PackageListCachePath = PackageManager.StorePath + "\\WebPackageListCache.json";
             static private HttpClient HTTPClient = new();
 
             static private class Endpoints
@@ -364,58 +365,87 @@ namespace LCModManager
                 static public string PackageList = BaseURL + "/package";
             }
 
+            //Cache singleton
+            public sealed class PackageCache
+            {
+                PackageCache()
+                {
+                }
+
+                static private Dictionary<string, PackageListing> _Cache;
+                static public DateTime LastRefresh = new FileInfo(PackageListCachePath).LastWriteTime;
+
+                static public Dictionary<string, PackageListing> Instance
+                {
+                    get
+                    {
+                        if (_Cache == null) Refresh();
+
+                        lock (_Cache)
+                        {
+                            try
+                            {
+                                return _Cache;
+                            }
+                            catch
+                            {
+                                return null;
+                            }
+                        }
+                    }
+                }
+
+                async public static void Refresh()
+                {
+                    _Cache = new();
+
+                    foreach (PackageListing package in await GetPackageList()) _Cache.Add(package.full_name, package);
+
+                    LastRefresh = DateTime.Now;
+                }
+            }
+
             async static public Task<bool> DownloadPackageList()
             {
                 try
                 {
-                    using HttpResponseMessage response = await HTTPClient.GetAsync(Endpoints.PackageList);
+                    HttpResponseMessage response = await HTTPClient.GetAsync(Endpoints.PackageList);
+                    
+                    string jsonString = Encoding.UTF8.GetString(await response.Content.ReadAsByteArrayAsync());
 
-                    if (response.StatusCode == HttpStatusCode.OK)
-                    {
-                        byte[] body = await response.Content.ReadAsByteArrayAsync();
-                        string jsonString = Encoding.UTF8.GetString(body);
+                    response.Dispose();
 
-                        File.WriteAllText(PackageListCache, jsonString, Encoding.UTF8);
+                    File.WriteAllText(PackageListCachePath, jsonString, Encoding.UTF8);
 
-                        return true;
-                    }
-                    else
-                    {
-                        return false;
-                    }
+                    return true;
                 }
-                catch (HttpRequestException e)
+                catch (Exception ex)
                 {
-                    Debug.WriteLine(e.Message);
+                    Debug.WriteLine(ex.Message);
                     return false;
                 }
             }
 
-            async static public Task<List<PackageListing>> GetPackageList()
+            async static public Task<List<PackageListing>?> GetPackageList()
             {
-                FileInfo fileInfo = new FileInfo(PackageListCache);
+                if (!File.Exists(PackageListCachePath) && !await DownloadPackageList()) return null; 
 
-                if (!File.Exists(PackageListCache) || (DateTime.Now - fileInfo.LastWriteTime).TotalHours > 12)
+                try
                 {
-                    await DownloadPackageList();
+                    FileStream file = File.OpenRead(PackageListCachePath);
+
+                    PackageListing[] packages = JsonSerializer.Deserialize<PackageListing[]>(file);
+
+                    file.Close();
+                    file.Dispose();
+
+                    return new List<PackageListing>(packages);
                 }
-
-                FileStream file = File.OpenRead(PackageListCache);
-
-                PackageListing[] packages = JsonSerializer.Deserialize<PackageListing[]>(file);
-
-                file.Close();
-
-                return new List<PackageListing>(packages);
-            }
-
-            async static public Task<PackageListing?> SearchPackageList(Predicate<PackageListing> predicate)
-            {
-                List<PackageListing> packages = await GetPackageList();
-
-                int index = packages.FindIndex(predicate);
-
-                return index >= 0 ? packages[index] : null;
+                catch (Exception ex)
+                {
+                    Debug.Write(ex);
+                    return null;
+                }
             }
 
             async static public Task<string?> DownloadPackage(PackageListing listing)
@@ -434,10 +464,7 @@ namespace LCModManager
 
                         return downloadLocation;
                     }
-                    else
-                    {
-                        return null;
-                    }
+                    else return null;
                 }
                 else return downloadLocation;
             }
@@ -458,12 +485,9 @@ namespace LCModManager
 
                         return downloadLocation;
                     }
-                    else
-                    {
-                        return null;
-                    }
+                    else return null;
                 }
-                else return null;
+                else return downloadLocation;
             }
         }
     }

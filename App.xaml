@@ -11,7 +11,7 @@
                 <Setter Property="Height" Value="32" />
                 <Setter Property="Width" Value="32" />
                 <Setter Property="Margin" Value="3" />
-                <Setter Property="RenderTransformOrigin" Value="0.502,0.5" />
+                <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
             </Style>
             <Style x:Key="HyperlinkTextBlock" TargetType="TextBlock">
                 <Setter Property="Padding" Value="10" />

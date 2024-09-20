@@ -15,11 +15,11 @@ using System.Windows.Shapes;
 namespace LCModManager
 {
     /// <summary>
-    /// Interaction logic for ResolveDependenciesWindow.xaml
+    /// Interaction logic for WebClientWindow.xaml
     /// </summary>
-    public partial class ResolveDependenciesWindow : Window
+    public partial class WebClientWindow : Window
     {
-        public ResolveDependenciesWindow()
+        public WebClientWindow()
         {
             InitializeComponent();
         }

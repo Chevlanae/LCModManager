@@ -7,7 +7,6 @@ using System.Windows.Media.Imaging;
 
 namespace LCModManager
 {
-
     static internal class AppConfig
     {
         static public class PackageStorePaths
@@ -149,42 +148,33 @@ namespace LCModManager
         {
             if (Dependencies != null)
             {
+                List<ModEntry> modlist = new(entries);
                 List<string> missingDeps = [];
                 List<string> mismatchedDeps = [];
 
                 foreach (string depStr in Dependencies)
                 {
-                    string[] EdepStr = depStr.Split("-");
-                    string depStrName = EdepStr[^2];
-                    string depStrVersion = EdepStr[^1];
-                    bool found = false;
+                    string[] depStrParts = depStr.Split('-');
 
-                    foreach (ModEntry entry in entries)
+                    List<ModEntry> foundDependencies = modlist.FindAll(e => e.Name == depStrParts[^2]);
+
+                    if (foundDependencies.Count > 0)
                     {
-                        if (entry.Name != null && entry.Version != null)
+                        bool versionMatch = false;
+                        foreach (ModEntry entry in foundDependencies)
                         {
-                            //Check dependency string against regex.
-                            if (entry.Name == depStrName)
+                            if (entry.Version == depStrParts[^1])
                             {
-                                if(entry.Version == depStrVersion) 
-                                {
-                                    foreach (string str in mismatchedDeps)
-                                    {
-                                        //Remove mismatched dependency if matching version found.
-                                        if (str.Split("-")[^2] == depStrName) mismatchedDeps.Remove(str);
-                                    }
-                                    
-                                }
-
-                                else mismatchedDeps.Add(depStr);
-
-                                found = true;
+                                versionMatch = true;
                                 break;
                             }
                         }
-                    }
 
-                    if (!found) missingDeps.Add(depStr);
+                        if (!versionMatch) mismatchedDeps.Add(depStr);
+                    }
+                    else missingDeps.Add(depStr);
+
+
                 }
 
                 MismatchedDependencies = [.. mismatchedDeps];

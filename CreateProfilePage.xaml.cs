@@ -83,29 +83,14 @@ namespace LCModManager
 
             };
 
-            bool? result = dialog.ShowDialog();
-
-            if (result == true && dialog.FileNames.Length > 0)
+            if (dialog.ShowDialog() == true && dialog.FileNames.Length > 0)
             {
                 foreach (string filename in dialog.FileNames)
                 {
-                    if (ProfileManager.GetProfile(filename) is ModProfile profile)
+                    if (ProfileManager.GetProfile(filename) is ModProfile profile && !ProfileManager.GetProfiles().Exists(p => p.Name == profile.Name))
                     {
-                        bool found = false;
-                        foreach(ModProfile existingProfile in ProfileManager.GetProfiles())
-                        {
-                            if(existingProfile.Name == profile.Name)
-                            {
-                                found = true; 
-                                break;
-                            }
-                        }
-
-                        if (!found)
-                        {
-                            ProfileManager.AddProfile(profile);
-                            ProfileSelectorControl.SelectedIndex = ProfileSelectorControl.Items.Add(profile);
-                        }
+                        ProfileManager.AddProfile(profile);
+                        ProfileSelectorControl.SelectedIndex = ProfileSelectorControl.Items.Add(profile);
                     }
                 }
             }
@@ -142,13 +127,13 @@ namespace LCModManager
                 {
                     foreach (var package in dialog.ModListControl.SelectedItems)
                     {
-                        if (package is ModEntryDisplay modEntry)
+                        if (package is ModEntryDisplay modEntryDisplay)
                         {
-                            profile.Add(modEntry.ToModEntry());
+                            profile.Add(modEntryDisplay.ToModEntry());
                         }
-                        else if(package is ModEntry modEntryBase)
+                        else if(package is ModEntry modEntry)
                         {
-                            profile.Add(modEntryBase);
+                            profile.Add(modEntry);
                         }
                     }
 

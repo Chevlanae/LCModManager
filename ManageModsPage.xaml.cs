@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
+using System.Diagnostics;
 
 namespace LCModManager
 {
@@ -12,10 +13,10 @@ namespace LCModManager
     partial class ManageModsPage : Page
     {
         public ObservableCollection<ModEntryDisplay> ModList;
+        private Dictionary<string, PackageListing> _PackageCache = WebClient.PackageCache.Instance;
 
         public ManageModsPage()
         {
-
             ModList = [];
 
             InitializeComponent();
@@ -83,7 +84,11 @@ namespace LCModManager
 
         private void WebPackage_Click(object sender, RoutedEventArgs e)
         {
+            WebClientWindow window = new();
 
+            window.ShowDialog();
+
+            e.Handled = true;
         }
 
         private void RefreshModList_Click(object sender, RoutedEventArgs e)
@@ -94,26 +99,44 @@ namespace LCModManager
 
         async private void ResolveDependencies_Click(object sender, RoutedEventArgs e)
         {
-            
+            List<string> missingDependencies = [];
+            List<string> nonExistantDependencies = [];
 
-            foreach(ModEntry entry in ModList)
+            foreach(ModEntryDisplay entry in ModList)
             {
-                PackageListing? query = await WebClient.SearchPackageList(p => p.name == entry.Name);
-
-                if (query != null)
+                foreach(string dep in entry.MissingDependencies)
                 {
-                    foreach (PackageListingVersionEntry v in query.Value.versions)
+                    if (!missingDependencies.Contains(dep)) missingDependencies.Add(dep);
+                }
+
+                foreach (string dep in entry.MismatchedDependencies)
+                {
+                    if (!missingDependencies.Contains(dep)) missingDependencies.Add(dep);
+                }
+            }
+
+            foreach(string dep in missingDependencies)
+            {
+                string fullname = String.Join("-", dep.Split("-")[..^1]);
+                string version = dep.Split("-")[^1];
+                bool found = false;
+
+                foreach (PackageListingVersionEntry v in _PackageCache[fullname].versions)
+                {
+                    if (v.version_number == version)
                     {
-                        if(v.version_number == entry.Version)
+                        found = true;
+
+                        string? downloadPath = await WebClient.DownloadPackage(v);
+
+                        if (downloadPath != null)
                         {
-                            string? downloadPath = await WebClient.DownloadPackage(v);
-                            if (downloadPath != null)
-                            {
-                                PackageManager.AddPackage(downloadPath);
-                            }
+                            PackageManager.AddPackage(downloadPath);
                         }
                     }
                 }
+
+                if (!found) nonExistantDependencies.Add(dep);
             }
 
             RefreshModList();

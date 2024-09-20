@@ -15,8 +15,6 @@ namespace LCModManager
     {
         public App()
         {
-            Regex bep = new("BepInEx");
-
             AppConfig.CreateDataStores();
         }
 
@@ -32,5 +30,4 @@ namespace LCModManager
             e.Handled = true;
         }
     }
-
 }
