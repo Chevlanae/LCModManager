@@ -5,44 +5,13 @@ using System.Xml.Serialization;
 
 namespace LCModManager
 {
-    namespace Converters
-    {
-        [ValueConversion(typeof(ModProfile), typeof(String))]
-        public class ModProfileConverter : IValueConverter
-        {
-            public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
-            {
-                if (value is ModProfile profile)
-                {
-                    return profile.Name;
-                }
-                else return "";
-            }
-
-            public object ConvertBack(object value, Type targetType, object paramter, CultureInfo culture)
-            {
-                if (value is string name)
-                {
-                    string path = AppConfig.ProfileStorePath + "\\" + name + ".xml";
-                    ModProfile? profile = ProfileManager.GetProfile(path);
-
-                    if (profile != null) return profile;
-                    else return new ModProfile();
-                }
-                else return new ModProfile();
-            }
-        }
-    }
-
     public class ModProfile
     {
-
         public List<ModEntry> ModList = [];
 
         public string Name { get; set; }
 
         public int Count => ModList.Count;
-
 
         public ModEntry this[int index] 
         { 
@@ -52,7 +21,7 @@ namespace LCModManager
             }
             set
             {
-                if( value is ModEntryDisplay modEntry)
+                if (value is ModEntryDisplay modEntry)
                 {
                     ModList[index] = modEntry.ToModEntry();
                 }
@@ -155,7 +124,6 @@ namespace LCModManager
             {
                 try
                 {
-
                     XmlSerializer x = new(typeof(ModProfile));
 
                     using Stream fileReader = File.OpenRead(path);

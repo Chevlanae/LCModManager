@@ -4,15 +4,11 @@
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
       xmlns:local="clr-namespace:LCModManager"
-      xmlns:converters="clr-namespace:LCModManager.Converters"
       xmlns:sys="clr-namespace:System;assembly=mscorlib"
       mc:Ignorable="d" 
       d:DesignHeight="450" d:DesignWidth="800"
       x:Name="Profiles"
       Title="Profile Page">
-    <Page.Resources>
-        <converters:ModProfileConverter x:Key="ProfileStrConverter" />
-    </Page.Resources>
     <Grid>
         <ToolBar ToolBarTray.IsLocked="True" VerticalAlignment="Top" Height="40" FontSize="12" Grid.ColumnSpan="2">
             <ToolBar.Resources>

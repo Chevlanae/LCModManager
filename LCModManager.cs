@@ -92,9 +92,9 @@ namespace LCModManager
         public string Path { get; set; }
         public string Name { get; set; }
         public string? Description { get; set; }
-        public string? Version { get; set; }
         public string? Website { get; set; }
         public string? IconUri { get; set; }
+        public string[]? Versions { get; set; }
         public string[]? Dependencies { get; set; }
         public string[]? MissingDependencies { get; set; }
         public string[]? MismatchedDependencies { get; set; }
@@ -105,9 +105,9 @@ namespace LCModManager
         public string Path { get; set; } = "";
         public string Name { get; set; } = "";
         public string? Description { get; set; }
-        public string? Version { get; set; }
         public string? Website { get; set; }
         public string? IconUri { get; set; }
+        public string[]? Versions { get; set; }
         public string[]? Dependencies { get; set; }
         public string[]? MissingDependencies { get; set; }
         public string[]? MismatchedDependencies { get; set; }
@@ -142,6 +142,8 @@ namespace LCModManager
             }
         }
 
+        public string? SelectedVersion;
+
         public bool ExistsInPackageStore = false;
 
         public void ProcessDependencies(IEnumerable<ModEntry> entries)
@@ -163,18 +165,22 @@ namespace LCModManager
                         bool versionMatch = false;
                         foreach (ModEntry entry in foundDependencies)
                         {
-                            if (entry.Version == depStrParts[^1])
+                            if (entry.Versions != null)
                             {
-                                versionMatch = true;
-                                break;
+                                foreach (string version in entry.Versions)
+                                {
+                                    if(version == depStrParts[^1])
+                                    {
+                                        versionMatch = true;
+                                        break;
+                                    }
+                                }
                             }
                         }
 
                         if (!versionMatch) mismatchedDeps.Add(depStr);
                     }
                     else missingDeps.Add(depStr);
-
-
                 }
 
                 MismatchedDependencies = [.. mismatchedDeps];
@@ -189,11 +195,12 @@ namespace LCModManager
                 Path = Path,
                 Name = Name,
                 Description = Description,
-                Version = Version,
+                Versions = Versions,
                 Website = Website,
                 IconUri = IconUri,
                 Dependencies = Dependencies,
-                MissingDependencies = MissingDependencies
+                MissingDependencies = MissingDependencies,
+                MismatchedDependencies = MismatchedDependencies
             };
         }
     }

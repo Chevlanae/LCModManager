@@ -13,11 +13,115 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="20" />
         </Grid.RowDefinitions>
-        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Text="SEARCH" />
-        <DataGrid Grid.Row="1">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Orientation="Horizontal">
+            <TextBox x:Name="QueryTextBox" KeyDown="QueryTextBox_KeyDown" MinWidth="200" />
+            <Button x:Name="StartQueryButton" Click="StartQueryButton_Click" Content="Search" Padding="10,0,10,0" Margin="10,0,0,0" />
+        </StackPanel>
+        <DataGrid Grid.Row="1" x:Name="ModListControl" 
+          GridLinesVisibility="Horizontal"  
+          Style="{StaticResource DataGridStyle}">
+            <DataGrid.Resources>
+                <ResourceDictionary>
+                    <Style x:Key="{x:Type DataGridCell}" TargetType="{x:Type DataGridCell}">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="BorderBrush" Value="Transparent" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="Transparent" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                                <Setter Property="Foreground" Value="Black"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                    <Style TargetType="{x:Type DataGridRow}">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="BorderBrush" Value="Transparent" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="MinHeight" Value="64" />
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="LightBlue" />
+                                <Setter Property="BorderBrush" Value="Transparent" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                    <Style x:Key="TextBlockStyle" TargetType="TextBlock" >
+                        <Setter Property="Padding" Value="10" />
+                        <Setter Property="HorizontalAlignment" Value="Left" />
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                        <Setter Property="TextWrapping" Value="Wrap" />
+                    </Style>
+                    <Style x:Key="DependenciesIcon" TargetType="Image" >
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Path=HasMissingDependencies}" Value="True">
+                                <Setter Property="Source" Value="/Resources/Warning-Icon.png" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Path=HasMissingDependencies}" Value="False">
+                                <Setter Property="Source" Value="/Resources/Check-Icon.png" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                        <Setter Property="HorizontalAlignment" Value="Center" />
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                        <Setter Property="Height" Value="16" />
+                        <Setter Property="Width" Value="16" />
+                        <Setter Property="Margin" Value="3" />
+                    </Style>
+                    <Style x:Key="DependenciesList" TargetType="ListBox">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Path=HasMissingDependencies}" Value="True">
+                                <Setter Property="ItemsSource" Value="{Binding Path=MissingDependencies}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Path=HasMissingDependencies}" Value="False">
+                                <Setter Property="ItemsSource" Value="{Binding Path=Dependencies}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                        <Setter Property="ItemsSource" Value="{Binding Path=MissingDependencies}" />
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="BorderBrush" Value="Transparent" />
+                    </Style>
+                    <Style x:Key="DependenciesText" TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Path=HasMissingDependencies}" Value="True">
+                                <Setter Property="Foreground" Value="Red" />
+                                <Setter Property="Text" Value="Missing Dependencies:" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Path=HasMissingDependencies}" Value="False">
+                                <Setter Property="Foreground" Value="Green" />
+                                <Setter Property="Text" Value="Dependencies Detected:" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                        <Setter Property="Padding" Value="5" />
+                    </Style>
+                </ResourceDictionary>
+            </DataGrid.Resources>
             <DataGrid.Columns>
+                <DataGridTemplateColumn Header="Icon" MinWidth="64">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Image Height="64" Width="64" Source="{Binding Path=Icon}" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Name}"  MinWidth="100" MaxWidth="200" Width="*" >
+                    <DataGridTextColumn.Header>
+                        <TextBlock Text="Name" />
+                    </DataGridTextColumn.Header>
+                </DataGridTextColumn>
+                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Description}" MinWidth="300"  Width="*">
+                    <DataGridTextColumn.Header>
+                        <TextBlock Text="Description" />
+                    </DataGridTextColumn.Header>
+                </DataGridTextColumn>
+                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Version}" MinWidth="70">
+                    <DataGridTextColumn.Header>
+                        <TextBlock Text="Version" />
+                    </DataGridTextColumn.Header>
+                </DataGridTextColumn>
+                <DataGridHyperlinkColumn ElementStyle="{StaticResource HyperlinkTextBlock}" Header="Website" Binding="{Binding Path=Website}" MinWidth="64">
+                </DataGridHyperlinkColumn>
             </DataGrid.Columns>
         </DataGrid>
-        <TextBlock Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="ITEMCOUNT" Margin="0,0,10,0" />
+        <TextBlock x:Name="ItemCountTextBlock" Grid.Row="2" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,10,0" />
     </Grid>
 </Window>

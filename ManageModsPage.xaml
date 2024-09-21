@@ -3,7 +3,7 @@
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
       xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-      xmlns:local="clr-namespace:LCModManager"
+      xmlns:local="clr-namespace:LCModManager" 
       mc:Ignorable="d" 
       d:DesignHeight="1080" d:DesignWidth="1920"
       x:Name="Mods"
@@ -153,11 +153,6 @@
                 <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Name}"  MinWidth="100" MaxWidth="200" Width="*" >
                     <DataGridTextColumn.Header>
                         <TextBlock Text="Name" />
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
-                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Version}" MinWidth="70">
-                    <DataGridTextColumn.Header>
-                        <TextBlock Text="Version" />
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
                 <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Description}" MinWidth="300"  Width="*">

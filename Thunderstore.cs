@@ -13,6 +13,7 @@ using System.Text.RegularExpressions;
 using System.Windows.Documents;
 using System.Windows.Media.Imaging;
 using System.Xml.Serialization;
+using static LCModManager.Thunderstore.WebClient;
 
 namespace LCModManager
 {
@@ -37,11 +38,47 @@ namespace LCModManager
             }
         }
 
+        public struct PackageListingVersionEntry
+        {
+            public string name { get; set; }
+            public string full_name { get; set; }
+            public string description { get; set; }
+            public string icon { get; set; }
+            public string version_number { get; set; }
+            public string[] dependencies { get; set; }
+            public string download_url { get; set; }
+            public long downloads { get; set; }
+            public string date_created { get; set; }
+            public string website_url { get; set; }
+            public bool is_active { get; set; }
+            public string uuid4 { get; set; }
+            public long file_size { get; set; }
+        }
+
+        public struct PackageListing
+        {
+            public string name { get; set; }
+            public string full_name { get; set; }
+            public string owner { get; set; }
+            public string package_url { get; set; }
+            public string donation_link { get; set; }
+            public string date_created { get; set; }
+            public string date_updated { get; set; }
+            public string uuid4 { get; set; }
+            public int rating_score { get; set; }
+            public bool is_pinned { get; set; }
+            public bool is_deprecated { get; set; }
+            public bool has_nsfw_content { get; set; }
+            public string[] categories { get; set; }
+            public PackageListingVersionEntry[] versions { get; set; }
+        }
+
         internal class ModPackage : ModEntryDisplay
         {
             private string? _ReadMe;
             private string? _ChangeLog;
             private ModManifest _Manifest;
+            public bool IsWebPackage = false;
 
             public string? ReadMe => _ReadMe;
             public string? ChangeLog => _ChangeLog;
@@ -50,9 +87,20 @@ namespace LCModManager
             {
                 Path = sourcePath;
 
+                List<string> versions = new();
+                foreach (string versionPath in Directory.GetDirectories(sourcePath).OrderDescending().ToArray())
+                {
+                    versions.Add(versionPath.Split("\\").Last());
+                }
+
+                Versions = versions.ToArray();
+                SelectedVersion = Versions[0];
+
+                string selectedVersionPath = Path + "\\" + SelectedVersion;
+
                 try
                 {
-                    _ReadMe = File.ReadAllText(sourcePath + "\\README.md");
+                    _ReadMe = File.ReadAllText(selectedVersionPath + "\\README.md");
                 }
                 catch
                 {
@@ -61,7 +109,7 @@ namespace LCModManager
 
                 try
                 {
-                    _ChangeLog = File.ReadAllText(sourcePath + "\\CHANGELOG.md");
+                    _ChangeLog = File.ReadAllText(selectedVersionPath + "\\CHANGELOG.md");
                 }
                 catch
                 {
@@ -70,24 +118,71 @@ namespace LCModManager
 
                 Icon = new BitmapImage();
                 Icon.BeginInit();
-                Icon.UriSource = new Uri(sourcePath + "\\icon.png");
+                Icon.UriSource = new Uri(selectedVersionPath + "\\icon.png");
                 Icon.DecodePixelWidth = 64;
                 Icon.DecodePixelHeight = 64;
                 Icon.CacheOption = BitmapCacheOption.OnLoad;
                 Icon.EndInit();
 
-                _Manifest = new ModManifest(File.ReadAllText(sourcePath + "\\manifest.json"), new(JsonSerializerDefaults.Web));
+                _Manifest = new ModManifest(File.ReadAllText(selectedVersionPath + "\\manifest.json"), new(JsonSerializerDefaults.Web));
                 Name = _Manifest.Name ?? "";
                 Description = _Manifest.Description;
-                Version = _Manifest.Version_Number;
                 Website = _Manifest.Website_Url;
                 Dependencies = _Manifest.Dependencies;
+                ExistsInPackageStore = true;
+            }
+
+            public ModPackage(PackageListing listing)
+            {
+                IsWebPackage = true;
+                Path = listing.package_url;
+                Icon = new BitmapImage();
+                Icon.BeginInit();
+                Icon.UriSource = new Uri(listing.versions[0].icon);
+                Icon.DecodePixelWidth = 64;
+                Icon.DecodePixelHeight = 64;
+                Icon.CacheOption = BitmapCacheOption.OnLoad;
+                Icon.EndInit();
+                Name = listing.name;
+                Description = listing.versions[0].description;
+                Website = listing.package_url;
+                Versions = [];
+                Dependencies = [];
+
+                foreach (PackageListingVersionEntry entry in listing.versions)
+                {
+                    Versions.Append(entry.version_number);
+
+                    foreach (string dep in entry.dependencies)
+                    {
+                        if(!Dependencies.Contains(dep)) Dependencies.Append(dep);
+                    }
+                }
+            }
+
+            public ModPackage(PackageListingVersionEntry entry)
+            {
+                IsWebPackage = true;
+                Path = entry.download_url;
+                Icon = new BitmapImage();
+                Icon.BeginInit();
+                Icon.UriSource = new Uri(entry.icon);
+                Icon.DecodePixelWidth = 64;
+                Icon.DecodePixelHeight = 64;
+                Icon.CacheOption = BitmapCacheOption.OnLoad;
+                Icon.EndInit();
+                Name = entry.name;
+                Description = entry.description;
+                Versions = [entry.version_number];
+                Website = entry.website_url;
+                Dependencies = entry.dependencies;
             }
 
             public ModPackage(ModEntry entry, bool notFound = false)
             {
                 if (notFound)
                 {
+                    Path = entry.Path;
                     Icon = new BitmapImage();
                     Icon.BeginInit();
                     Icon.UriSource = new Uri("pack://application:,,,/Resources/PackageNotFound.png");
@@ -97,17 +192,17 @@ namespace LCModManager
                     Icon.EndInit();
                     Name = entry.Name;
                     Description = entry.Description;
-                    Version = entry.Version;
+                    Versions = entry.Versions;
                     Website = entry.Website;
                     Dependencies = entry.Dependencies;
-                    ExistsInPackageStore = false;
                 }
                 else
                 {
+                    Path = entry.Path;
                     Icon = null;
                     Name = entry.Name;
                     Description = entry.Description;
-                    Version = entry.Version;
+                    Versions = entry.Versions;
                     Website = entry.Website;
                     Dependencies = entry.Dependencies;
                 }
@@ -120,14 +215,25 @@ namespace LCModManager
             static private Regex WinDuplicateFileReg = new("\\([0-9]+\\)\\.[a-zA-Z0-9]+$", RegexOptions.Compiled);
             static private Regex WinDuplicateDirReg = new("\\([0-9]+\\)$", RegexOptions.Compiled);
             static private Regex FileReg = new("\\.[a-zA-Z0-9]+$", RegexOptions.Compiled);
+            static private Regex PackageNameReg = new(".*-.+\\..+\\..+", RegexOptions.Compiled);
             static private Regex PackageSourceFluffReg = new(WinDuplicateFileReg + "|" + WinDuplicateDirReg + "|" + FileReg, RegexOptions.Compiled);
 
             async static public void AddPackage(string packageSourcePath)
             {
-                string dirName = packageSourcePath.Split("\\").Last(); //Lop off end of path
-                dirName = dirName[..^(PackageSourceFluffReg.Match(dirName).Length)]; //Lop off file extension and/or duplicate item patterns
+                string sourceName = packageSourcePath.Split("\\").Last(); //lop off path
 
-                string destPath = StorePath + "\\" + dirName;
+                if (!PackageNameReg.IsMatch(sourceName)) return; //return if filename does not match package pattern
+
+                string[] nameparts = sourceName[..^(PackageSourceFluffReg.Match(sourceName).Length)].Split("-"); //Lop off file extension and/or duplicate item patterns
+                string name = nameparts[^2]; //package name
+                string version = nameparts[^1]; //package version
+                string destDir = StorePath + "\\" + name; //destination directory in package store
+                string destPath = destDir + "\\" + version; //destination path in destination directory
+
+                //create destination directory if it does not exist
+                if (!Directory.Exists(destDir)) Directory.CreateDirectory(destDir); 
+
+                //Copy directory if directory, or unzip file if zip file 
                 if (Directory.Exists(packageSourcePath) && !Directory.Exists(destPath))
                 {
                     Utils.CopyDirectory(packageSourcePath, destPath, true);
@@ -145,18 +251,11 @@ namespace LCModManager
 
                 try
                 {
-                    ModPackage newPackage = new(destPath);
-                    string packName = newPackage.Name + "-" + newPackage.Version;
-
-                    if(dirName != packName)
-                    {
-                        string newDestPath = StorePath + "\\" + packName;
-                        Directory.Move(destPath, newDestPath);
-                    }
+                    ModPackage newPackage = new(destDir);
                 }
                 catch (Exception e)
                 {
-                    Directory.Delete(destPath, true);
+                    Directory.Delete(destDir, true);
                     Debug.WriteLine(e);
                 }
             }
@@ -170,7 +269,7 @@ namespace LCModManager
             {
                 List<ModPackage> packages = GetPackages();
 
-                foreach (ModPackage p in packages.Where(p => p.Name == package.Name && p.Version == package.Version))
+                foreach (ModPackage p in packages.Where(p => p.Name == package.Name))
                 {
                     RemovePackage(p);
                 }
@@ -190,11 +289,11 @@ namespace LCModManager
             {
                 List<ModPackage> packages = [];
 
-                foreach (string file in Directory.GetDirectories(StorePath))
+                foreach (string directory in Directory.GetDirectories(StorePath))
                 {
                     try
                     {
-                        packages.Add(new ModPackage(file));
+                        packages.Add(new ModPackage(directory));
                     }
                     catch (Exception e)
                     {
@@ -319,41 +418,6 @@ namespace LCModManager
             }
         }
 
-        public struct PackageListingVersionEntry
-        {
-            public string name { get; set; }
-            public string full_name { get; set; }
-            public string description { get; set; }
-            public string icon { get; set; }
-            public string version_number { get; set; }
-            public string[] dependencies { get; set; }
-            public string download_url { get; set; }
-            public long downloads { get; set; }
-            public string date_created { get; set; }
-            public string website_url { get; set; }
-            public bool is_active { get; set; }
-            public string uuid4 { get; set; }
-            public long file_size { get; set; }
-        }
-
-        public struct PackageListing
-        {
-            public string name { get; set; }
-            public string full_name { get; set; }
-            public string owner { get; set; }
-            public string package_url { get; set; }
-            public string donation_link { get; set; }
-            public string date_created { get; set; }
-            public string date_updated { get; set; }
-            public string uuid4 { get; set; }
-            public int rating_score { get; set; }
-            public bool is_pinned { get; set; }
-            public bool is_deprecated { get; set; }
-            public bool has_nsfw_content { get; set; }
-            public string[] categories { get; set; }
-            public PackageListingVersionEntry[] versions { get; set; }
-        }
-
         static internal class WebClient
         {
             static public string PackageListCachePath = PackageManager.StorePath + "\\WebPackageListCache.json";
@@ -368,41 +432,44 @@ namespace LCModManager
             //Cache singleton
             public sealed class PackageCache
             {
-                PackageCache()
-                {
-                }
-
-                static private Dictionary<string, PackageListing> _Cache;
+                static private Dictionary<string, PackageListing> _Cache = new();
                 static public DateTime LastRefresh = new FileInfo(PackageListCachePath).LastWriteTime;
 
                 static public Dictionary<string, PackageListing> Instance
                 {
                     get
                     {
-                        if (_Cache == null) Refresh();
+                        if(_Cache.Count == 0) Refresh();
 
                         lock (_Cache)
                         {
-                            try
-                            {
-                                return _Cache;
-                            }
-                            catch
-                            {
-                                return null;
-                            }
+                            return _Cache;
                         }
                     }
                 }
 
+                PackageCache()
+                {
+                }
+
                 async public static void Refresh()
                 {
-                    _Cache = new();
-
+                    _Cache.Clear();
                     foreach (PackageListing package in await GetPackageList()) _Cache.Add(package.full_name, package);
-
                     LastRefresh = DateTime.Now;
                 }
+            }
+
+            static public List<PackageListing> SearchPackageCache(Func<KeyValuePair<string, PackageListing>, bool> predicate)
+            {
+                List<PackageListing> list = new();
+
+                foreach (KeyValuePair<string, PackageListing> listing in PackageCache.Instance.Where(predicate))
+                {
+                    list.Add(listing.Value);
+                }
+
+                return list;
             }
 
             async static public Task<bool> DownloadPackageList()
@@ -428,7 +495,10 @@ namespace LCModManager
 
             async static public Task<List<PackageListing>?> GetPackageList()
             {
-                if (!File.Exists(PackageListCachePath) && !await DownloadPackageList()) return null; 
+                if(!File.Exists(PackageListCachePath) || (DateTime.Now - new FileInfo(PackageListCachePath).LastWriteTime).TotalHours > 24)
+                {
+                    if (!await DownloadPackageList()) return null;
+                }
 
                 try
                 {

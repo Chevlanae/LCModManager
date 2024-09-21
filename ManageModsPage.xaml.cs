@@ -12,13 +12,11 @@ namespace LCModManager
     /// </summary>
     partial class ManageModsPage : Page
     {
-        public ObservableCollection<ModEntryDisplay> ModList;
+        public ObservableCollection<ModEntryDisplay> ModList = [];
         private Dictionary<string, PackageListing> _PackageCache = WebClient.PackageCache.Instance;
 
         public ManageModsPage()
         {
-            ModList = [];
-
             InitializeComponent();
 
             ModListControl.ItemsSource = ModList;
@@ -36,8 +34,6 @@ namespace LCModManager
             }
 
             foreach(ModEntryDisplay mod in ModList) mod.ProcessDependencies(ModList);
-
-
         }
 
         private void AddPackage_Click(object sender, RoutedEventArgs e)

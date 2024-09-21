@@ -29,7 +29,7 @@ namespace LCModManager
             RefreshModList();
         }
 
-        private void RefreshModList()
+        async private void RefreshModList()
         {
             if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
@@ -43,7 +43,17 @@ namespace LCModManager
                     }
                     else
                     {
-                        ModList.Add(new ModPackage(entry, true));
+                        List<PackageListing> query = WebClient.SearchPackageCache(p => p.Key.Split("-")[^1] == entry.Name);
+
+                        switch (query.Count)
+                        {
+                            case 1:
+                                ModList.Add(new ModPackage(query[0]));
+                                break;
+                            default:
+                                ModList.Add(new ModPackage(entry, true));
+                                break;
+                        }
                     }
                 }
 
@@ -150,10 +160,9 @@ namespace LCModManager
         {
             if(ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
-
                 foreach (ModEntry entry in ModListControl.SelectedItems)
                 {
-                    profile.ModList.RemoveAll(e => e.Name == entry.Name && e.Version == entry.Version);
+                    profile.ModList.RemoveAll(e => e.Name == entry.Name);
                 }
 
                 ProfileManager.SaveProfile(profile);

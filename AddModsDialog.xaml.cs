@@ -29,7 +29,6 @@ namespace LCModManager
 
             foreach (ModEntryDisplay package in PackageManager.GetPackages())
             {
-
                 //skip existing entries
                 bool found = false;
                 foreach (ModEntryDisplay entry in existingEntries)
