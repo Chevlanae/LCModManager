@@ -65,6 +65,9 @@
             <Button x:Name="RemoveModsButton" Click="RemoveModsButton_Click" Style="{StaticResource ToolBarButton}">
                 <Image Height="16" Width="16" Source="/Resources/RedXIcon.png" />
             </Button>
+            <Button x:Name="ResolveDependencies" Click="ResolveDependencies_Click" Style="{StaticResource ToolBarButton}">
+                <Image Height="16" Width="16" Source="/Resources/Dependencies-Icon.png" ></Image>
+            </Button>
         </ToolBar>
         <DataGrid x:Name="ModListControl"
               GridLinesVisibility="Horizontal" 
@@ -186,6 +189,21 @@
                     </Style.Triggers>
                     <Setter Property="Padding" Value="5" />
                 </Style>
+                <Style x:Key="InstalledIcon" TargetType="Image" >
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Path=ExistsInPackageStore}" Value="True">
+                            <Setter Property="Source" Value="/Resources/Check-Icon.png" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Path=ExistsInPackageStore}" Value="False">
+                            <Setter Property="Source" Value="/Resources/RedXIcon.png" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                    <Setter Property="HorizontalAlignment" Value="Center" />
+                    <Setter Property="VerticalAlignment" Value="Center" />
+                    <Setter Property="Height" Value="16" />
+                    <Setter Property="Width" Value="16" />
+                    <Setter Property="Margin" Value="3" />
+                </Style>
             </DataGrid.Resources>
             <DataGrid.Columns>
                 <DataGridTemplateColumn Header="Icon" MinWidth="64">
@@ -200,7 +218,7 @@
                         <TextBlock Text="Name" />
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
-                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Version}" MinWidth="70">
+                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Versions[0]}" MinWidth="70">
                     <DataGridTextColumn.Header>
                         <TextBlock Text="Version" />
                     </DataGridTextColumn.Header>
@@ -210,8 +228,6 @@
                         <TextBlock Text="Description" />
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
-                <DataGridHyperlinkColumn ElementStyle="{StaticResource HyperlinkTextBlock}" Header="Website" Binding="{Binding Path=Website}" MinWidth="64">
-                </DataGridHyperlinkColumn>
                 <DataGridTemplateColumn Header="Dependencies" MinWidth="90" Width="90">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
@@ -227,6 +243,13 @@
                                     </ToolTip>
                                 </Image.ToolTip>
                             </Image>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Installed" MinWidth="90" Width="90">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Image  Style="{StaticResource InstalledIcon}" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

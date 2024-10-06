@@ -9,14 +9,19 @@
     <Grid>
         <Grid.ColumnDefinitions />
         <Grid.RowDefinitions>
-            <RowDefinition Height="100" />
+            <RowDefinition Height="40"/>
             <RowDefinition Height="*" />
             <RowDefinition Height="20" />
         </Grid.RowDefinitions>
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Orientation="Horizontal">
-            <TextBox x:Name="QueryTextBox" KeyDown="QueryTextBox_KeyDown" MinWidth="200" />
-            <Button x:Name="StartQueryButton" Click="StartQueryButton_Click" Content="Search" Padding="10,0,10,0" Margin="10,0,0,0" />
-        </StackPanel>
+        <ToolBar ToolBarTray.IsLocked="True" VerticalAlignment="Top" Height="40" FontSize="12" Grid.ColumnSpan="2">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Orientation="Horizontal" Margin="10,0,10,0">
+                <TextBox x:Name="QueryTextBox" KeyDown="QueryTextBox_KeyDown" MinWidth="200" />
+                <Button x:Name="StartQueryButton" Click="StartQueryButton_Click" Content="Search" Padding="10,0,10,0" Margin="10,0,0,0" />
+            </StackPanel>
+            <Button x:Name="AddPackage" Click="AddPackage_Click" Style="{StaticResource ToolBarButton}">
+                <Image Height="16" Width="16" Source="/Resources/Green_Plus.png" ></Image>
+            </Button>
+        </ToolBar>
         <DataGrid Grid.Row="1" x:Name="ModListControl" 
           GridLinesVisibility="Horizontal"  
           Style="{StaticResource DataGridStyle}">
@@ -52,47 +57,6 @@
                         <Setter Property="VerticalAlignment" Value="Center" />
                         <Setter Property="TextWrapping" Value="Wrap" />
                     </Style>
-                    <Style x:Key="DependenciesIcon" TargetType="Image" >
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding Path=HasMissingDependencies}" Value="True">
-                                <Setter Property="Source" Value="/Resources/Warning-Icon.png" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding Path=HasMissingDependencies}" Value="False">
-                                <Setter Property="Source" Value="/Resources/Check-Icon.png" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                        <Setter Property="HorizontalAlignment" Value="Center" />
-                        <Setter Property="VerticalAlignment" Value="Center" />
-                        <Setter Property="Height" Value="16" />
-                        <Setter Property="Width" Value="16" />
-                        <Setter Property="Margin" Value="3" />
-                    </Style>
-                    <Style x:Key="DependenciesList" TargetType="ListBox">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding Path=HasMissingDependencies}" Value="True">
-                                <Setter Property="ItemsSource" Value="{Binding Path=MissingDependencies}" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding Path=HasMissingDependencies}" Value="False">
-                                <Setter Property="ItemsSource" Value="{Binding Path=Dependencies}" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                        <Setter Property="ItemsSource" Value="{Binding Path=MissingDependencies}" />
-                        <Setter Property="Background" Value="Transparent" />
-                        <Setter Property="BorderBrush" Value="Transparent" />
-                    </Style>
-                    <Style x:Key="DependenciesText" TargetType="TextBlock">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding Path=HasMissingDependencies}" Value="True">
-                                <Setter Property="Foreground" Value="Red" />
-                                <Setter Property="Text" Value="Missing Dependencies:" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding Path=HasMissingDependencies}" Value="False">
-                                <Setter Property="Foreground" Value="Green" />
-                                <Setter Property="Text" Value="Dependencies Detected:" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                        <Setter Property="Padding" Value="5" />
-                    </Style>
                 </ResourceDictionary>
             </DataGrid.Resources>
             <DataGrid.Columns>
@@ -108,17 +72,31 @@
                         <TextBlock Text="Name" />
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
+                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Author}"  MinWidth="100" MaxWidth="200" Width="*" >
+                    <DataGridTextColumn.Header>
+                        <TextBlock Text="Author" />
+                    </DataGridTextColumn.Header>
+                </DataGridTextColumn>
+                <DataGridTemplateColumn Header="Versions" MinWidth="100">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <ListView ItemsSource="{Binding Path=Versions}" 
+                                HorizontalAlignment="Center" 
+                                VerticalAlignment="Center" 
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                MaxHeight="100"
+                                SelectionMode="Extended"
+                                SelectionChanged="VersionListView_SelectionChanged"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Description}" MinWidth="300"  Width="*">
                     <DataGridTextColumn.Header>
                         <TextBlock Text="Description" />
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
-                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Version}" MinWidth="70">
-                    <DataGridTextColumn.Header>
-                        <TextBlock Text="Version" />
-                    </DataGridTextColumn.Header>
-                </DataGridTextColumn>
-                <DataGridHyperlinkColumn ElementStyle="{StaticResource HyperlinkTextBlock}" Header="Website" Binding="{Binding Path=Website}" MinWidth="64">
+                <DataGridHyperlinkColumn ElementStyle="{StaticResource HyperlinkTextBlock}" Header="Thunderstore Link" Binding="{Binding Path=Website}" MinWidth="110">
                 </DataGridHyperlinkColumn>
             </DataGrid.Columns>
         </DataGrid>

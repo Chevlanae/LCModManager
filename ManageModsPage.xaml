@@ -141,6 +141,29 @@
                     </Style.Triggers>
                     <Setter Property="Padding" Value="5" />
                 </Style>
+                <Style x:Key="VersionListBoxStyle" TargetType="ListBox">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding Path=Versions.Count}" Value="1">
+                            <Setter Property="ItemContainerStyle">
+                                <Setter.Value>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="Focusable" Value="False" />
+                                    </Style>
+                                </Setter.Value>
+                            </Setter>
+                        </DataTrigger>
+                        <Trigger Property="ActualHeight" Value="100">
+                            <Setter Property="Margin" Value="20,0,0,0" />
+                        </Trigger>
+                    </Style.Triggers>
+                    <Setter Property="ItemsSource" Value="{Binding Path=Versions}" />
+                    <Setter Property="HorizontalAlignment" Value="Center" />
+                    <Setter Property="VerticalAlignment" Value="Center" />
+                    <Setter Property="MaxHeight" Value="100" />
+                    <Setter Property="SelectionMode" Value="Extended" />
+                    <Setter Property="Background" Value="Transparent" />
+                    <Setter Property="BorderBrush" Value="Transparent" />
+                </Style>
             </DataGrid.Resources>
             <DataGrid.Columns>
                 <DataGridTemplateColumn Header="Icon" MinWidth="64">
@@ -155,6 +178,13 @@
                         <TextBlock Text="Name" />
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
+                <DataGridTemplateColumn Header="Versions" MinWidth="100">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <ListView Style="{StaticResource VersionListBoxStyle}" SelectionChanged="VersionListView_SelectionChanged"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Description}" MinWidth="300"  Width="*">
                     <DataGridTextColumn.Header>
                         <TextBlock Text="Description" />

@@ -29,18 +29,20 @@ namespace LCModManager
 
         private void NavTo_ManageMods(object sender, RoutedEventArgs e)
         {
+            ManageMods.RefreshModList();
             ViewFrame.Navigate(ManageMods);
         }
 
         private void NavTo_CreateProfile(object sender, RoutedEventArgs e)
         {
+            CreateProfile.RefreshModList();
             ViewFrame.Navigate(CreateProfile);
         }
 
         private void NavTo_Launcher(object sender, RoutedEventArgs e)
         {
-            ViewFrame.Navigate(Launcher);
             Launcher.RefreshProfiles();
+            ViewFrame.Navigate(Launcher);
         }
     }
 }

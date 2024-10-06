@@ -1,9 +1,10 @@
 ﻿using LCModManager.Thunderstore;
+using Microsoft.Win32;
+using System;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.Win32;
-using System.Diagnostics;
 
 namespace LCModManager
 {
@@ -24,7 +25,7 @@ namespace LCModManager
             RefreshModList();
         }
 
-        private void RefreshModList()
+        public void RefreshModList()
         {
             ModList.Clear();
 
@@ -33,7 +34,7 @@ namespace LCModManager
                 ModList.Add(package);
             }
 
-            foreach(ModEntryDisplay mod in ModList) mod.ProcessDependencies(ModList);
+            foreach (ModEntryDisplay mod in ModList) mod.ProcessDependencies(ModList.ToList());
         }
 
         private void AddPackage_Click(object sender, RoutedEventArgs e)
@@ -43,12 +44,12 @@ namespace LCModManager
                 DefaultExt = ".zip",
                 Filter = "ZIP Files (*.zip)|*.zip",
                 Multiselect = true,
-                
+
             };
 
             if (dialog.ShowDialog() == true && dialog.FileNames.Length > 0)
             {
-                foreach(string filename in dialog.FileNames)
+                foreach (string filename in dialog.FileNames)
                 {
                     PackageManager.AddPackage(filename);
                 }
@@ -62,14 +63,7 @@ namespace LCModManager
 
         private void RemovePackage_Click(object sender, RoutedEventArgs e)
         {
-            List<ModPackage> items = [];
-
-            foreach (ModPackage entry in ModListControl.SelectedItems)
-            {
-                items.Add(entry);
-            }
-
-            foreach (ModPackage package in items)
+            foreach (ModPackage package in ModListControl.SelectedItems)
             {
                 PackageManager.RemovePackage(package);
             }
@@ -78,12 +72,35 @@ namespace LCModManager
             e.Handled = true;
         }
 
-        private void WebPackage_Click(object sender, RoutedEventArgs e)
+        async private void WebPackage_Click(object sender, RoutedEventArgs e)
         {
             WebClientWindow window = new();
 
-            window.ShowDialog();
+            if (window.ShowDialog() == true)
+            {
+                foreach (ModEntryDisplay selectedItem in window.ModListControl.SelectedItems)
+                {
+                    string packageKey = selectedItem.Author + "-" + selectedItem.Name;
 
+                    if (selectedItem.SelectedVersions.Count > 0)
+                    {
+                        foreach (string version in selectedItem.SelectedVersions)
+                        {
+                            string? downloadPath = await WebClient.DownloadPackage(window.QueriedPackages[packageKey].versions.First(v => v.version_number == version));
+
+                            if (downloadPath != null) PackageManager.AddPackage(downloadPath);
+                        }
+                    }
+                    else
+                    {
+                        string? downloadPath = await WebClient.DownloadPackage(window.QueriedPackages[packageKey].versions[0]);
+
+                        if (downloadPath != null) PackageManager.AddPackage(downloadPath);
+                    }
+                }
+            }
+
+            RefreshModList();
             e.Handled = true;
         }
 
@@ -95,47 +112,65 @@ namespace LCModManager
 
         async private void ResolveDependencies_Click(object sender, RoutedEventArgs e)
         {
-            List<string> missingDependencies = [];
-            List<string> nonExistantDependencies = [];
-
-            foreach(ModEntryDisplay entry in ModList)
+            while (ModList.Any(m => m.HasIncompatibility))
             {
-                foreach(string dep in entry.MissingDependencies)
+                foreach (ModEntryDisplay entry in ModList)
                 {
-                    if (!missingDependencies.Contains(dep)) missingDependencies.Add(dep);
-                }
-
-                foreach (string dep in entry.MismatchedDependencies)
-                {
-                    if (!missingDependencies.Contains(dep)) missingDependencies.Add(dep);
-                }
-            }
-
-            foreach(string dep in missingDependencies)
-            {
-                string fullname = String.Join("-", dep.Split("-")[..^1]);
-                string version = dep.Split("-")[^1];
-                bool found = false;
-
-                foreach (PackageListingVersionEntry v in _PackageCache[fullname].versions)
-                {
-                    if (v.version_number == version)
+                    if (entry.HasIncompatibility)
                     {
-                        found = true;
+                        List<string> missingDependencies = [];
 
-                        string? downloadPath = await WebClient.DownloadPackage(v);
+                        foreach (string dep in entry.MissingDependencies) missingDependencies.Add(dep);
 
-                        if (downloadPath != null)
+                        foreach (string dep in entry.MismatchedDependencies)
                         {
-                            PackageManager.AddPackage(downloadPath);
+                            if (!missingDependencies.Contains(dep)) missingDependencies.Add(dep);
+                        }
+
+                        foreach (string dep in missingDependencies)
+                        {
+                            string fullname = String.Join("-", dep.Split("-")[..^1]);
+                            string version = dep.Split("-")[^1];
+
+                            try
+                            {
+                                foreach (PackageListingVersionEntry v in _PackageCache[fullname].versions)
+                                {
+                                    if (v.version_number == version)
+                                    {
+                                        string? downloadPath = await WebClient.DownloadPackage(v);
+
+                                        if (downloadPath != null) PackageManager.AddPackage(downloadPath);
+
+                                        break;
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.Write(ex);
+                                Debug.WriteLine(dep + "not found in package cache");
+                            }
                         }
                     }
                 }
 
-                if (!found) nonExistantDependencies.Add(dep);
+                RefreshModList();
             }
 
-            RefreshModList();
+            e.Handled = true;
+        }
+
+        private void VersionListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ListView list && list.DataContext is ModEntryDisplay entry)
+            {
+                entry.SelectedVersions.Clear();
+                foreach (string version in list.SelectedItems)
+                {
+                    entry.SelectedVersions.Add(version);
+                }
+            }
         }
     }
 }

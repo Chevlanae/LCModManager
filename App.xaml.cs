@@ -1,10 +1,9 @@
-﻿using System.Diagnostics;
+﻿using LCModManager.Thunderstore;
+using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Navigation;
-
-using LCModManager.Thunderstore;
 
 namespace LCModManager
 {
@@ -16,6 +15,7 @@ namespace LCModManager
         public App()
         {
             AppConfig.CreateDataStores();
+            WebClient.PackageCache.Refresh();
         }
 
         private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)

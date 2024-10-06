@@ -9,15 +9,16 @@ namespace LCModManager
 {
     static internal class AppConfig
     {
+        static public string ResourcePath = Environment.GetEnvironmentVariable("LOCALAPPDATA") + "\\LCModManager";
+        static public string PackageStorePath = ResourcePath + "\\mods";
+        static public string ProfileStorePath = ResourcePath + "\\profiles";
+        static public string DownloadStorePath = ResourcePath + "\\downloads";
+        static public Tuple<int, int, int> WebCacheRefreshInterval = new(30, 0, 0);
+
         static public class PackageStorePaths
         {
             static public string Thunderstore = PackageStorePath + "\\Thunderstore";
         }
-
-        static public string ResourcePath = Environment.GetEnvironmentVariable("APPDATA") + "\\LCModManager";
-        static public string PackageStorePath = ResourcePath + "\\mods";
-        static public string ProfileStorePath = ResourcePath + "\\profiles";
-        static public string DownloadStorePath = ResourcePath + "\\downloads";
 
         static public void CreateDataStores()
         {
@@ -89,12 +90,14 @@ namespace LCModManager
 
     public interface IModEntry
     {
+        public bool ExistsInPackageStore { get; set; }
         public string Path { get; set; }
         public string Name { get; set; }
+        public string? Author { get; set; }
         public string? Description { get; set; }
         public string? Website { get; set; }
         public string? IconUri { get; set; }
-        public string[]? Versions { get; set; }
+        public List<string> Versions { get; set; }
         public string[]? Dependencies { get; set; }
         public string[]? MissingDependencies { get; set; }
         public string[]? MismatchedDependencies { get; set; }
@@ -102,12 +105,14 @@ namespace LCModManager
 
     public class ModEntry : IModEntry
     {
+        public bool ExistsInPackageStore { get; set; } = false;
         public string Path { get; set; } = "";
         public string Name { get; set; } = "";
+        public string? Author { get; set; }
         public string? Description { get; set; }
         public string? Website { get; set; }
         public string? IconUri { get; set; }
-        public string[]? Versions { get; set; }
+        public List<string> Versions { get; set; } = [];
         public string[]? Dependencies { get; set; }
         public string[]? MissingDependencies { get; set; }
         public string[]? MismatchedDependencies { get; set; }
@@ -120,8 +125,7 @@ namespace LCModManager
         {
             get
             {
-                if (MissingDependencies != null && MissingDependencies.Length > 0) return true;
-                else return false;
+                return MissingDependencies != null && MissingDependencies.Length > 0;
             }
         }
 
@@ -129,8 +133,7 @@ namespace LCModManager
         {
             get
             {
-                if (MismatchedDependencies != null && MismatchedDependencies.Length > 0) return true;
-                else return false;
+                return MismatchedDependencies != null && MismatchedDependencies.Length > 0;
             }
         }
 
@@ -142,45 +145,57 @@ namespace LCModManager
             }
         }
 
-        public string? SelectedVersion;
+        public List<string> SelectedVersions = [];
 
-        public bool ExistsInPackageStore = false;
-
-        public void ProcessDependencies(IEnumerable<ModEntry> entries)
+        public void ProcessDependencies(List<ModEntryDisplay> modlist)
         {
             if (Dependencies != null)
             {
-                List<ModEntry> modlist = new(entries);
                 List<string> missingDeps = [];
                 List<string> mismatchedDeps = [];
 
                 foreach (string depStr in Dependencies)
                 {
                     string[] depStrParts = depStr.Split('-');
+                    string owner = depStrParts[^3];
+                    string name = depStrParts[^2];
+                    string version = depStrParts[^1];
 
-                    List<ModEntry> foundDependencies = modlist.FindAll(e => e.Name == depStrParts[^2]);
+                    List<ModEntryDisplay> foundDependencies = modlist.FindAll(e => e.Name == name);
 
-                    if (foundDependencies.Count > 0)
+                    switch (foundDependencies.Count)
                     {
-                        bool versionMatch = false;
-                        foreach (ModEntry entry in foundDependencies)
-                        {
-                            if (entry.Versions != null)
-                            {
-                                foreach (string version in entry.Versions)
-                                {
-                                    if(version == depStrParts[^1])
-                                    {
-                                        versionMatch = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                        case 0:
 
-                        if (!versionMatch) mismatchedDeps.Add(depStr);
+                            missingDeps.Add(depStr);
+                            break;
+
+                        case 1:
+
+                            if (!foundDependencies[0].ExistsInPackageStore)
+                            {
+                                missingDeps.Add(depStr);
+                            }
+                            else if (!foundDependencies[0].Versions.Contains(version))
+                            {
+                                mismatchedDeps.Add(depStr);
+                            }
+                            break;
+
+                        default:
+                            bool match = false;
+                            foreach (ModEntryDisplay item in foundDependencies)
+                            {
+                                if (item.Versions.Contains(version))
+                                {
+                                    match = true;
+                                    break;
+                                }
+
+                            }
+                            if (!match) mismatchedDeps.Add(depStr);
+                            break;
                     }
-                    else missingDeps.Add(depStr);
                 }
 
                 MismatchedDependencies = [.. mismatchedDeps];
@@ -194,14 +209,34 @@ namespace LCModManager
             {
                 Path = Path,
                 Name = Name,
+                Author = Author,
                 Description = Description,
                 Versions = Versions,
                 Website = Website,
                 IconUri = IconUri,
                 Dependencies = Dependencies,
                 MissingDependencies = MissingDependencies,
-                MismatchedDependencies = MismatchedDependencies
+                MismatchedDependencies = MismatchedDependencies,
+                ExistsInPackageStore = ExistsInPackageStore
             };
+        }
+    }
+
+    public class PackageState
+    {
+        public string SelectedVersion;
+        public ModEntry ModEntry;
+
+        public PackageState()
+        {
+            SelectedVersion = "";
+            ModEntry = new ModEntry();
+        }
+
+        public PackageState(string selectedVersion, ModEntry modEntry)
+        {
+            SelectedVersion = selectedVersion;
+            ModEntry = modEntry;
         }
     }
 }

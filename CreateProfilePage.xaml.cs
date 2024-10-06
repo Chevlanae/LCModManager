@@ -1,10 +1,13 @@
-﻿using System.Collections.ObjectModel;
+﻿using LCModManager.Thunderstore;
+using Microsoft.Win32;
+using System;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.Intrinsics.Arm;
+using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
-using System.Text.RegularExpressions;
-using LCModManager.Thunderstore;
-using Microsoft.Win32;
-using System.IO;
 
 namespace LCModManager
 {
@@ -25,33 +28,46 @@ namespace LCModManager
             {
                 ProfileSelectorControl.Items.Add(profile);
             }
-
-            RefreshModList();
         }
 
-        async private void RefreshModList()
+        async public void RefreshModList()
         {
             if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
                 ModList.Clear();
 
-                foreach (ModEntry entry in profile.ModList)
+                foreach (PackageState package in profile.PackageList)
                 {
-                    if (Directory.Exists(entry.Path))
+                    try
                     {
-                        ModList.Add(new ModPackage(entry.Path));
+                        ModPackage newPackage = new(package.ModEntry.Path);
+                        newPackage.Versions = [package.SelectedVersion];
+                        ModList.Add(newPackage);
                     }
-                    else
+                    catch
                     {
-                        List<PackageListing> query = WebClient.SearchPackageCache(p => p.Key.Split("-")[^1] == entry.Name);
+                        List<PackageListing> query = WebClient.SearchPackageCache(p => p.Key.Split("-")[^1] == package.ModEntry.Name);
 
                         switch (query.Count)
                         {
                             case 1:
-                                ModList.Add(new ModPackage(query[0]));
+
+                                ModList.Add(new ModPackage(query[0], package.SelectedVersion));
                                 break;
                             default:
-                                ModList.Add(new ModPackage(entry, true));
+
+                                bool match = false;
+                                foreach (PackageListing item in query)
+                                {
+                                    if (item.owner == package.ModEntry.Author)
+                                    {
+                                        ModList.Add(new ModPackage(item, package.SelectedVersion));
+                                        match = true;
+                                        break;
+                                    }
+                                }
+
+                                if (!match) ModList.Add(new ModPackage(package.ModEntry, true));
                                 break;
                         }
                     }
@@ -59,7 +75,7 @@ namespace LCModManager
 
                 foreach (ModEntryDisplay mod in ModList)
                 {
-                    mod.ProcessDependencies(ModList);
+                    mod.ProcessDependencies(ModList.ToList());
                 }
             }
         }
@@ -129,22 +145,26 @@ namespace LCModManager
 
         private void AddModsButton_Click(object sender, RoutedEventArgs e)
         {
-            if(ProfileSelectorControl.SelectedItem is ModProfile profile)
+            if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
                 AddModsDialog dialog = new(ModList);
 
                 if (dialog.ShowDialog() == true)
                 {
-                    foreach (var package in dialog.ModListControl.SelectedItems)
+                    foreach (ModPackage package in dialog.ModListControl.SelectedItems)
                     {
-                        if (package is ModEntryDisplay modEntryDisplay)
+                        if (package.SelectedVersions.Count > 0)
                         {
-                            profile.Add(modEntryDisplay.ToModEntry());
+                            package.Versions = [package.SelectedVersions[0]];
                         }
-                        else if(package is ModEntry modEntry)
+                        else
                         {
-                            profile.Add(modEntry);
+                            package.Versions = [package.Versions[0]];
                         }
+
+                        PackageState state = new(package.Versions[0], package.ToModEntry());
+
+                        if (!profile.Contains(state)) profile.Add(state);
                     }
 
                     ProfileManager.SaveProfile(profile);
@@ -158,16 +178,61 @@ namespace LCModManager
 
         private void RemoveModsButton_Click(object sender, RoutedEventArgs e)
         {
-            if(ProfileSelectorControl.SelectedItem is ModProfile profile)
+            if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
                 foreach (ModEntry entry in ModListControl.SelectedItems)
                 {
-                    profile.ModList.RemoveAll(e => e.Name == entry.Name);
+                    profile.PackageList.RemoveAll(e => e.ModEntry.Name == entry.Name);
                 }
 
                 ProfileManager.SaveProfile(profile);
 
                 RefreshModList();
+            }
+
+            e.Handled = true;
+        }
+
+        async private void ResolveDependencies_Click()
+        {
+            ResolveDependencies_Click(null, new RoutedEventArgs());
+        }
+
+        private async void ResolveDependencies_Click(object sender, RoutedEventArgs e)
+        {
+            if (ProfileSelectorControl.SelectedItem is ModProfile profile)
+            {
+                while(ModList.Any(m => m.HasIncompatibility))
+                {
+                    List<string> missingDependencies = new();
+
+                    foreach (ModEntryDisplay item in ModList)
+                    {
+                        foreach (string dep in item.MissingDependencies)
+                        {
+                            if (!missingDependencies.Contains(dep)) missingDependencies.Add(dep);
+                        }
+
+                        foreach (string dep in item.MismatchedDependencies)
+                        {
+                            if (!missingDependencies.Contains(dep)) missingDependencies.Add(dep);
+                        }
+                    }
+
+                    profile.DownloadDependencies(missingDependencies.ToArray());
+
+                    ProfileManager.SaveProfile(profile);
+
+                    foreach (ModEntryDisplay item in ModList)
+                    {
+                        if (!item.ExistsInPackageStore)
+                        {
+                            profile.DownloadDependency(item, item.Versions[0]);
+                        }
+                    }
+
+                    RefreshModList();
+                }
             }
 
             e.Handled = true;

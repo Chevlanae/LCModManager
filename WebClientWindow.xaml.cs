@@ -14,6 +14,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Xml.Linq;
 
 namespace LCModManager
 {
@@ -22,8 +23,8 @@ namespace LCModManager
     /// </summary>
     public partial class WebClientWindow : Window
     {
+        public Dictionary<string, PackageListing> QueriedPackages = new();
         public ObservableCollection<ModEntryDisplay> ModList = [];
-        private Dictionary<string, PackageListing> _PackageCache = WebClient.PackageCache.Instance;
 
         public WebClientWindow()
         {
@@ -34,13 +35,19 @@ namespace LCModManager
 
         private void StartQueryButton_Click()
         {
+            if (QueryTextBox.Text.Length < 2) return;
+
             ModList.Clear();
+            QueriedPackages.Clear();
 
-            Regex reg = new Regex(QueryTextBox.Text.ToLower());
+            Regex reg = new(Regex.Escape(QueryTextBox.Text), RegexOptions.IgnoreCase);
 
-            foreach (KeyValuePair<string, PackageListing> listing in _PackageCache.Where(k => reg.IsMatch(k.Value.name.ToLower())))
+            foreach (PackageListing listing in WebClient.SearchPackageCache(k => reg.IsMatch(k.Value.name)))
             {
-                ModList.Add(new ModPackage(listing.Value.versions[0]));
+                ModPackage newPackage = new ModPackage(listing);
+                newPackage.Website = listing.package_url;
+                ModList.Add(newPackage);
+                QueriedPackages[listing.full_name] = listing;
             }
 
             ItemCountTextBlock.Text = "Returned " + ModList.Count.ToString() + " Results";
@@ -49,11 +56,33 @@ namespace LCModManager
         private void StartQueryButton_Click(object sender, RoutedEventArgs e)
         {
             StartQueryButton_Click();
+
+            e.Handled = true;
         }
 
         private void QueryTextBox_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter) StartQueryButton_Click();
+        }
+
+        private void VersionListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ListView list && list.DataContext is ModEntryDisplay entry)
+            {
+                entry.SelectedVersions.Clear();
+                foreach (string version in list.SelectedItems)
+                {
+                    entry.SelectedVersions.Add(version);
+                }
+            }
+
+            e.Handled = true;
+        }
+
+        private void AddPackage_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = true;
+            e.Handled = true;
         }
     }
 }

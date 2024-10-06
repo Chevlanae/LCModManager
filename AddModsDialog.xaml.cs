@@ -1,6 +1,7 @@
 ﻿using LCModManager.Thunderstore;
 using System.Collections.ObjectModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 
 namespace LCModManager
@@ -10,13 +11,11 @@ namespace LCModManager
     /// </summary>
     public partial class AddModsDialog : Window
     {
-        public ObservableCollection<ModEntryDisplay> ModList = [];
+        public ObservableCollection<ModEntryDisplay> ModList = new(PackageManager.GetPackages());
 
         public AddModsDialog()
         {
             InitializeComponent();
-
-            foreach (ModEntryDisplay package in PackageManager.GetPackages()) ModList.Add(package);
 
             ModListControl.ItemsSource = ModList;
         }
@@ -29,18 +28,8 @@ namespace LCModManager
 
             foreach (ModEntryDisplay package in PackageManager.GetPackages())
             {
-                //skip existing entries
-                bool found = false;
-                foreach (ModEntryDisplay entry in existingEntries)
-                {
-                    if (package.Name == entry.Name)
-                    {
-                        found = true;
-                        break;
-                    }
-                }
-
-                if (!found) ModList.Add(package);
+                if (existingEntries.Any(e => e.Name == package.Name && e.Author == package.Author)) continue;
+                else ModList.Add(package);
             }
 
             ModListControl.ItemsSource = ModList;
@@ -58,11 +47,25 @@ namespace LCModManager
 
         private void ModListControl_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if(e.Key == Key.Enter)
+            if (e.Key == Key.Enter)
             {
                 DialogResult = true;
                 e.Handled = true;
             }
+        }
+
+        private void VersionListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (sender is ListView list && list.DataContext is ModEntryDisplay entry)
+            {
+                entry.SelectedVersions.Clear();
+                foreach (string version in list.SelectedItems)
+                {
+                    entry.SelectedVersions.Add(version);
+                }
+            }
+
+            e.Handled = true;
         }
     }
 }

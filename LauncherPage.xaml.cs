@@ -30,21 +30,22 @@ namespace LCModManager
 
         async private void LaunchGame_Click(object sender, RoutedEventArgs e)
         {
-            ModProfile profile = ProfileSelectorControl.SelectedItem as ModProfile;
-
-            await ModDeployer.DeployProfile(profile);
-
-            string? gameDir = GameDirectory.Find();
-
-            if(gameDir != null)
+            if(ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
-                ProcessStartInfo info = new(gameDir + "\\Lethal Company.exe");
+                await ModDeployer.DeployProfile(profile);
 
-                Process? process = Process.Start(info);
+                string? gameDir = GameDirectory.Find();
 
-                process?.WaitForExit();
+                if (gameDir != null)
+                {
+                    ProcessStartInfo info = new(gameDir + "\\Lethal Company.exe");
 
-                ModDeployer.ExfiltrateProfile(profile);
+                    Process? process = Process.Start(info);
+
+                    process?.WaitForExit();
+
+                    ModDeployer.ExfiltrateProfile(profile);
+                }
             }
         }
     }
