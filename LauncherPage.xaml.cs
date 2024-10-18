@@ -11,8 +11,12 @@ namespace LCModManager
     /// </summary>
     public partial class LauncherPage : Page
     {
-        public LauncherPage()
+        private StatusBarControl _StatusBarControl;
+
+        public LauncherPage(StatusBarControl statusBarCtrl)
         {
+            _StatusBarControl = statusBarCtrl;
+
             InitializeComponent();
 
             RefreshProfiles();
@@ -30,7 +34,7 @@ namespace LCModManager
 
         async private void LaunchGame_Click(object sender, RoutedEventArgs e)
         {
-            if(ProfileSelectorControl.SelectedItem is ModProfile profile)
+            if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
                 await ModDeployer.DeployProfile(profile);
 

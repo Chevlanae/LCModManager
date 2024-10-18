@@ -17,9 +17,12 @@ namespace LCModManager
     public partial class CreateProfilePage : Page
     {
         public ObservableCollection<ModEntryDisplay> ModList = [];
+        private StatusBarControl _StatusBarControl;
 
-        public CreateProfilePage()
+        public CreateProfilePage(StatusBarControl statusBarCtrl)
         {
+            _StatusBarControl = statusBarCtrl;
+
             InitializeComponent();
 
             ModListControl.ItemsSource = ModList;
@@ -36,7 +39,7 @@ namespace LCModManager
             {
                 ModList.Clear();
 
-                foreach (PackageState package in profile.PackageList)
+                foreach (Package package in profile.PackageList)
                 {
                     try
                     {
@@ -162,7 +165,7 @@ namespace LCModManager
                             package.Versions = [package.Versions[0]];
                         }
 
-                        PackageState state = new(package.Versions[0], package.ToModEntry());
+                        Package state = new(package.Versions[0], package.ToModEntry());
 
                         if (!profile.Contains(state)) profile.Add(state);
                     }
@@ -202,7 +205,7 @@ namespace LCModManager
         {
             if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
-                while(ModList.Any(m => m.HasIncompatibility))
+                while (ModList.Any(m => m.HasIncompatibility))
                 {
                     List<string> missingDependencies = new();
 
@@ -219,7 +222,32 @@ namespace LCModManager
                         }
                     }
 
-                    profile.DownloadDependencies(missingDependencies.ToArray());
+                    foreach(string dep in missingDependencies)
+                    {
+                        string[] depParts = dep.Split('-');
+                        string downloadPath = await _StatusBarControl.DownloadWithProgress(dep);
+
+                        if (downloadPath != null)
+                        {
+                            ModPackage? newPackage = await PackageManager.AddPackage(downloadPath);
+
+                            if (newPackage != null)
+                            {
+                                Package? existingState = profile.PackageList.Find(p => p.ModEntry.Author == depParts[0] &&
+                                                                                    p.ModEntry.Name == depParts[1]);
+
+                                if (existingState != null && !existingState.ModEntry.ExistsInPackageStore)
+                                {
+                                    existingState.SelectedVersion = depParts[2];
+                                    existingState.ModEntry = newPackage.ToModEntry();
+                                }
+                                else if (existingState == null)
+                                {
+                                    profile.Add(new Package(depParts[2], newPackage.ToModEntry()));
+                                }
+                            }
+                        }
+                    }
 
                     ProfileManager.SaveProfile(profile);
 
@@ -227,7 +255,7 @@ namespace LCModManager
                     {
                         if (!item.ExistsInPackageStore)
                         {
-                            profile.DownloadDependency(item, item.Versions[0]);
+                            _StatusBarControl.DownloadWithProgress(item.Versions[0]);
                         }
                     }
 

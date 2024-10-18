@@ -25,9 +25,12 @@ namespace LCModManager
     {
         public Dictionary<string, PackageListing> QueriedPackages = new();
         public ObservableCollection<ModEntryDisplay> ModList = [];
+        private StatusBarControl _StatusBarControl;
 
-        public WebClientWindow()
+        public WebClientWindow(StatusBarControl statusBarCtrl)
         {
+            _StatusBarControl = statusBarCtrl;
+
             InitializeComponent();
 
             ModListControl.ItemsSource = ModList;

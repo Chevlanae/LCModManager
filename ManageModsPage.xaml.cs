@@ -3,6 +3,8 @@ using Microsoft.Win32;
 using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
+using System.Net.Http;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -14,10 +16,14 @@ namespace LCModManager
     partial class ManageModsPage : Page
     {
         public ObservableCollection<ModEntryDisplay> ModList = [];
-        private Dictionary<string, PackageListing> _PackageCache = WebClient.PackageCache.Instance;
 
-        public ManageModsPage()
+        private Dictionary<string, PackageListing> _PackageCache = WebClient.PackageCache.Instance;
+        private StatusBarControl _StatusBarControl;
+
+        public ManageModsPage(StatusBarControl statusBarCtrl)
         {
+            _StatusBarControl = statusBarCtrl;
+
             InitializeComponent();
 
             ModListControl.ItemsSource = ModList;
@@ -39,6 +45,8 @@ namespace LCModManager
 
         private void AddPackage_Click(object sender, RoutedEventArgs e)
         {
+
+
             OpenFileDialog dialog = new()
             {
                 DefaultExt = ".zip",
@@ -49,24 +57,31 @@ namespace LCModManager
 
             if (dialog.ShowDialog() == true && dialog.FileNames.Length > 0)
             {
+                _StatusBarControl.CurrentState = AppState.AddingModPackage;
+
                 foreach (string filename in dialog.FileNames)
                 {
                     PackageManager.AddPackage(filename);
                 }
 
+                _StatusBarControl.CurrentState = AppState.Idle;
+
                 RefreshModList();
             }
 
             e.Handled = true;
-
         }
 
         private void RemovePackage_Click(object sender, RoutedEventArgs e)
         {
+            _StatusBarControl.CurrentState = AppState.RemovingModPackage;
+
             foreach (ModPackage package in ModListControl.SelectedItems)
             {
                 PackageManager.RemovePackage(package);
             }
+
+            _StatusBarControl.CurrentState = AppState.Idle;
 
             RefreshModList();
             e.Handled = true;
@@ -74,7 +89,7 @@ namespace LCModManager
 
         async private void WebPackage_Click(object sender, RoutedEventArgs e)
         {
-            WebClientWindow window = new();
+            WebClientWindow window = new(_StatusBarControl);
 
             if (window.ShowDialog() == true)
             {
@@ -86,14 +101,14 @@ namespace LCModManager
                     {
                         foreach (string version in selectedItem.SelectedVersions)
                         {
-                            string? downloadPath = await WebClient.DownloadPackage(window.QueriedPackages[packageKey].versions.First(v => v.version_number == version));
+                            string? downloadPath = await _StatusBarControl.DownloadWithProgress(window.QueriedPackages[packageKey].versions.First(v => v.version_number == version));
 
                             if (downloadPath != null) PackageManager.AddPackage(downloadPath);
                         }
                     }
                     else
                     {
-                        string? downloadPath = await WebClient.DownloadPackage(window.QueriedPackages[packageKey].versions[0]);
+                        string? downloadPath = await _StatusBarControl.DownloadWithProgress(window.QueriedPackages[packageKey].versions[0]);
 
                         if (downloadPath != null) PackageManager.AddPackage(downloadPath);
                     }
@@ -138,9 +153,9 @@ namespace LCModManager
                                 {
                                     if (v.version_number == version)
                                     {
-                                        string? downloadPath = await WebClient.DownloadPackage(v);
+                                        string destinationPath = await _StatusBarControl.DownloadWithProgress(v);
 
-                                        if (downloadPath != null) PackageManager.AddPackage(downloadPath);
+                                        if (File.Exists(destinationPath)) PackageManager.AddPackage(destinationPath);
 
                                         break;
                                     }

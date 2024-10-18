@@ -231,6 +231,8 @@ namespace LCModManager
         static internal class PackageManager
         {
             static public string StorePath = AppConfig.PackageStorePath + "\\Thunderstore";
+
+            //Filename regex used primarily for AddPackage()
             static private Regex WinDuplicateFileReg = new("\\([0-9]+\\)\\.[a-zA-Z0-9]+$", RegexOptions.Compiled);
             static private Regex WinDuplicateDirReg = new("\\([0-9]+\\)$", RegexOptions.Compiled);
             static private Regex FileExtensionReg = new("\\.[a-zA-Z0-9]+$", RegexOptions.Compiled);
@@ -241,32 +243,31 @@ namespace LCModManager
             {
                 string sourceName = packageSourcePath.Split("\\").Last(); //lop off path
 
-                string[] nameparts = sourceName[..^(PackageSourceFluffReg.Match(sourceName).Length)].Split("-"); //Lop off file extension and/or duplicate item patterns
+                string[] nameparts = sourceName[..^(PackageSourceFluffReg.Match(sourceName).Length)].Split("-"); //Lop off file extension and/or duplicate file patterns, then split string at each "-"
 
                 if (nameparts.Length != 3 || !PackageNameReg.IsMatch(sourceName)) return null; //return null if sourceName does not match desired format
 
                 string owner = nameparts[^3]; //package owner
                 string name = nameparts[^2]; //package name
                 string version = nameparts[^1]; //package version
-                string destDir = StorePath + "\\" + name; //destination directory in package store
-                string destPath = destDir + "\\" + version; //destination path in destination directory
+                string nameDir = StorePath + "\\" + name; //destination directory in package store
+                string versionDir = nameDir + "\\" + version; //package path in destination directory
 
-                //create destination directory if it does not exist
-                if (!Directory.Exists(destDir)) Directory.CreateDirectory(destDir);
-                if (Directory.Exists(destPath)) Directory.Delete(destPath, true);
+                if (!Directory.Exists(nameDir)) Directory.CreateDirectory(nameDir); //if nameDir does not exist, create nameDir
+                if (Directory.Exists(versionDir)) Directory.Delete(versionDir, true); //if versionDir already exists, delete versionDir
 
                 if (File.Exists(packageSourcePath))
                 {
-                    //unzip file and extract to package store
+                    //unzip file at packageSourcePath and extract to versionDir
                     try
                     {
-                        File.SetAttributes(packageSourcePath, FileAttributes.Normal);
-                        using Stream file = File.Open(packageSourcePath, FileMode.Open, FileAccess.Read);
-                        using ZipArchive zip = new(file);
-                        zip.ExtractToDirectory(destPath);
-                        file.Close();
-                        file.Dispose();
-                        zip.Dispose();
+                        File.SetAttributes(packageSourcePath, FileAttributes.Normal); // ensure correct file permissions
+                        using Stream file = File.Open(packageSourcePath, FileMode.Open, FileAccess.Read); //open read stream
+                        using ZipArchive zip = new(file); //unzip file
+                        zip.ExtractToDirectory(versionDir); //extract zip
+                        file.Close(); //close file
+                        file.Dispose(); //release memory
+                        zip.Dispose(); 
                     }
                     catch (Exception ex)
                     {
@@ -274,20 +275,22 @@ namespace LCModManager
                         return null;
                     }
 
-                    //set manifest author and return new ModPackage class derived from destDir
+                    //set manifest author and return new ModPackage class derived from versionDir
                     try
                     {
-                        string manifestPath = destPath + "\\manifest.json";
+                        string manifestPath = versionDir + "\\manifest.json";
                         ModManifest manifest = new(File.ReadAllText(manifestPath), new(JsonSerializerDefaults.Web));
                         manifest.Author = owner;
                         File.WriteAllBytes(manifestPath, JsonSerializer.SerializeToUtf8Bytes<ModManifest>(manifest));
 
-                        return new ModPackage(destDir);
+                        return new ModPackage(nameDir);
                     }
-                    catch (Exception e)
+
+                    //Delete directory if there is a raised exception
+                    catch (Exception ex)
                     {
-                        Directory.Delete(destDir, true);
-                        Debug.WriteLine(e);
+                        Directory.Delete(nameDir, true);
+                        Debug.WriteLine(ex);
                         return null;
                     }
                 }
@@ -296,17 +299,21 @@ namespace LCModManager
 
             static public void RemovePackage(ModEntryDisplay package)
             {
+                // for each package who's name matches package.Name
                 foreach (ModPackage p in GetPackages().Where(p => p.Name == package.Name))
                 {
+                    // if no versions are selected, or all versions are selected, delete the entire package directory
                     if (package.SelectedVersions.Count == 0 || package.SelectedVersions.Count == package.Versions.Count)
                     {
                         Directory.Delete(p.Path, true);
                     }
+
+                    // else delete each directory for selected versions in package
                     else
                     {
                         foreach (string version in package.SelectedVersions)
                         {
-                            string versionPath = p.Path + "\\" + version;
+                            string versionPath = Path.Combine(p.Path, version);
                             if (Directory.Exists(versionPath)) Directory.Delete(versionPath, true);
                         }
                     }
@@ -332,8 +339,8 @@ namespace LCModManager
 
             static public List<ModPackage> GetPackages(string name)
             {
-                List<ModPackage> packages = [];
                 Regex regex = new Regex(name);
+                List<ModPackage> packages = [];
 
                 foreach (string file in Directory.GetDirectories(StorePath).Where(path => regex.IsMatch(path)))
                 {
@@ -358,9 +365,11 @@ namespace LCModManager
 
         static internal class ModDeployer
         {
+            //find Lethal Company game directory on system
             static public string GameDir = GameDirectory.Find();
 
-            static public string InferModParentDirectory(PackageState package)
+
+            static public string InferModParentDirectory(Package package)
             {
                 List<string> childDirs = [];
 
@@ -398,7 +407,7 @@ namespace LCModManager
                 }
             }
 
-            static public void DeployMod(PackageState package)
+            static public void DeployMod(Package package)
             {
                 string selectedVersionPath = package.ModEntry.Path + "\\" + package.SelectedVersion;
 
@@ -427,7 +436,7 @@ namespace LCModManager
                 else
                 {
                     if (Directory.Exists(profileInstanceDir)) Directory.Delete(profileInstanceDir);
-                    foreach (PackageState package in profile.PackageList) DeployMod(package);
+                    foreach (Package package in profile.PackageList) DeployMod(package);
                 }
 
                 while (!File.Exists(GameDir + "\\" + "doorstop_config.ini")) await Task.Delay(100);
@@ -487,15 +496,13 @@ namespace LCModManager
                     }
                 }
 
-                PackageCache()
-                {
-                }
+                PackageCache() { }
 
                 async public static void Refresh()
                 {
-                    List<PackageListing>? list = await GetPackageList((DateTime.Now - LastRefresh) > RefreshInterval);
+                    if((DateTime.Now - LastRefresh) > RefreshInterval) await WebClient.RefreshPackageListCache();
 
-                    if (list != null)
+                    if (await GetPackageList() is List<PackageListing> list)
                     {
                         _Cache.Clear();
                         foreach (PackageListing package in list) _Cache.Add(package.full_name, package);
@@ -529,34 +536,41 @@ namespace LCModManager
                 }
             }
 
-            async static public Task<bool> DownloadPackageList()
+            async static public Task<HttpResponseMessage?> DownloadPackageList()
             {
                 try
                 {
-                    HttpResponseMessage response = await HTTPClient.GetAsync(Endpoints.PackageList);
-
-                    string jsonString = Encoding.UTF8.GetString(await response.Content.ReadAsByteArrayAsync());
-
-                    response.Dispose();
-
-                    File.WriteAllText(PackageListCachePath, jsonString, Encoding.UTF8);
-
-                    return true;
+                    return await HTTPClient.GetAsync(Endpoints.PackageList, HttpCompletionOption.ResponseHeadersRead); ;
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine(ex.Message);
-                    return false;
+                    return null;
                 }
             }
 
-            async static public Task<List<PackageListing>?> GetPackageList(bool refresh = false)
+            async static public Task RefreshPackageListCache()
             {
-                if (!File.Exists(PackageListCachePath) || refresh)
-                { 
-                    await DownloadPackageList(); 
-                }
+                if (File.Exists(PackageListCachePath)) File.Delete(PackageListCachePath);
 
+                if (await DownloadPackageList() is HttpResponseMessage response)
+                {
+                    string jsonString = Encoding.UTF8.GetString(await response.Content.ReadAsByteArrayAsync());
+
+                    try
+                    {
+                        File.WriteAllText(PackageListCachePath, jsonString, Encoding.UTF8);
+                    }
+                    catch (IOException ex)
+                    {
+                        Debug.Write(ex);
+                    }
+                    
+                }
+            }
+
+            async static public Task<List<PackageListing>?> GetPackageList()
+            {
                 try
                 {
                     FileStream file = File.OpenRead(PackageListCachePath);
@@ -575,55 +589,57 @@ namespace LCModManager
                 }
             }
 
-            async static public Task<string[]?> DownloadPackage(PackageListing listing)
+            async static public Task<HttpResponseMessage?> DownloadPackage(PackageListingVersionEntry versionEntry, HttpCompletionOption completionOption = HttpCompletionOption.ResponseHeadersRead)
             {
-                List<string> paths = [];
-                foreach (PackageListingVersionEntry version in listing.versions)
+                try
                 {
-                    string? path = await DownloadPackage(version);
-                    if (path != null) paths.Add(path);
+                    return await HTTPClient.GetAsync(versionEntry.download_url, completionOption);
                 }
-
-                DownloadPackage(listing, "", "");
-
-                return paths.Count == 0 ? null : paths.ToArray();
+                catch (HttpRequestException ex)
+                {
+                    Debug.Write(ex);
+                    return null;
+                }
             }
 
-            async static public Task<string[]> DownloadPackage(PackageListing listing, params string[] versions)
+            async static public Task<HttpResponseMessage?> DownloadDependency(ModEntry entry, string version)
             {
-                string[] paths = new string[versions.Length];
-
-                foreach(PackageListingVersionEntry v in listing.versions)
+                if (entry.Author != null)
                 {
-                    if(versions.Contains(v.version_number))
-                    {
-                        paths.Append(await DownloadPackage(v));
-                    }
+                    return await DownloadDependency(entry.Author + "-" + entry.Name + "-" + version);
                 }
-
-                return paths;
+                else return null;
             }
 
-            async static public Task<string?> DownloadPackage(PackageListingVersionEntry versionEntry)
+            async static public Task<HttpResponseMessage?> DownloadDependency(string dependencyString, HttpCompletionOption completionOption = HttpCompletionOption.ResponseHeadersRead)
             {
-                string filename = versionEntry.full_name + ".zip";
-                string downloadLocation = AppConfig.DownloadStorePath + "\\" + filename;
+                string[] depParts = dependencyString.Split("-");
 
-                if (!File.Exists(downloadLocation))
+                PackageListing? query = WebClient.GetCachedPackage(depParts[^3] + "-" + depParts[^2]);
+
+                if (query != null)
                 {
-                    try
+                    PackageListingVersionEntry versionEntry = query.Value.versions.First(v => v.version_number == depParts[^1]);
+
+                    if(await DownloadPackage(versionEntry, completionOption) is HttpResponseMessage response)
                     {
-                        byte[] response = await HTTPClient.GetByteArrayAsync(versionEntry.download_url);
-                        File.WriteAllBytes(downloadLocation, response);
-                        return downloadLocation;
+                        return response;
                     }
-                    catch(HttpRequestException ex)
-                    {
-                        Debug.Write(ex);
-                        return null;
-                    }
+                    else return null;
                 }
-                else return downloadLocation;
+                else return null;
+            }
+
+            async static public Task<HttpResponseMessage?[]> DownloadDependencies(string[] dependencies)
+            {
+                HttpResponseMessage?[] responses = new HttpResponseMessage[dependencies.Length];
+
+                foreach (string dep in dependencies)
+                {
+                    responses.Append(await DownloadDependency(dep));
+                }
+
+                return responses;
             }
         }
     }

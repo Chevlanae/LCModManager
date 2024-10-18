@@ -10,13 +10,13 @@ namespace LCModManager
 {
     public class ModProfile
     {
-        public List<PackageState> PackageList = [];
+        public List<Package> PackageList = [];
 
         public string Name { get; set; }
 
         public int Count => PackageList.Count;
 
-        public PackageState this[int index]
+        public Package this[int index]
         {
             get
             {
@@ -45,62 +45,8 @@ namespace LCModManager
             int i = 0;
             foreach (ModEntryDisplay mod in modList)
             {
-                this[i] = new PackageState(mod.SelectedVersions[0], mod.ToModEntry());
+                this[i] = new Package(mod.SelectedVersions[0], mod.ToModEntry());
                 i++;
-            }
-        }
-
-        async public Task DownloadDependency(ModEntry entry, string version)
-        {
-            if (entry.Author != null)
-            {
-                DownloadDependency(entry.Author + "-" + entry.Name + "-" + version);
-            }
-        }
-
-        async public Task DownloadDependency(string dependencyString)
-        {
-            string[] depParts = dependencyString.Split("-");
-            string owner = depParts[^3];
-            string name = depParts[^2];
-            string version = depParts[^1];
-
-            PackageListing? query = WebClient.GetCachedPackage(owner + "-" + name);
-
-            if (query != null)
-            {
-                PackageListingVersionEntry versionEntry = query.Value.versions.First(v => v.version_number == version);
-
-                string? downloadPath = await WebClient.DownloadPackage(versionEntry);
-
-                if (downloadPath != null)
-                {
-                    ModPackage? newPackage = await PackageManager.AddPackage(downloadPath);
-
-                    if (newPackage != null)
-                    {
-                        PackageState? existingState = PackageList.Find(p => p.ModEntry.Author == owner &&
-                                                                            p.ModEntry.Name == name);
-
-                        if (existingState != null && !existingState.ModEntry.ExistsInPackageStore)
-                        {
-                            existingState.SelectedVersion = version;
-                            existingState.ModEntry = newPackage.ToModEntry();
-                        }
-                        else if (existingState == null)
-                        {
-                            Add(new PackageState(version, newPackage.ToModEntry()));
-                        }
-                    }
-                }
-            }
-        }
-
-        async public Task DownloadDependencies(string[] dependencies)
-        {
-            foreach (string dep in dependencies)
-            {
-                DownloadDependency(dep);
             }
         }
 
@@ -109,12 +55,12 @@ namespace LCModManager
             return Name;
         }
 
-        public int IndexOf(PackageState item)
+        public int IndexOf(Package item)
         {
             return PackageList.IndexOf(item);
         }
 
-        public void Insert(int index, PackageState item)
+        public void Insert(int index, Package item)
         {
             PackageList.Insert(index, item);
         }
@@ -124,22 +70,22 @@ namespace LCModManager
             PackageList.RemoveAt(index);
         }
 
-        internal void RemoveAll(Func<PackageState, bool> value)
+        internal void RemoveAll(Func<Package, bool> value)
         {
-            List<PackageState> removedItems = [];
+            List<Package> removedItems = [];
 
-            foreach (PackageState item in PackageList)
+            foreach (Package item in PackageList)
             {
                 if (value(item)) removedItems.Add(item);
             }
 
-            foreach (PackageState item in removedItems)
+            foreach (Package item in removedItems)
             {
                 PackageList.Remove(item);
             }
         }
 
-        public void Add(PackageState item)
+        public void Add(Package item)
         {
             PackageList.Add(item);
         }
@@ -149,17 +95,17 @@ namespace LCModManager
             PackageList.Clear();
         }
 
-        public bool Contains(PackageState item)
+        public bool Contains(Package item)
         {
             return PackageList.Contains(item);
         }
 
-        public void CopyTo(PackageState[] array, int arrayIndex)
+        public void CopyTo(Package[] array, int arrayIndex)
         {
             PackageList.CopyTo(array, arrayIndex);
         }
 
-        public bool Remove(PackageState item)
+        public bool Remove(Package item)
         {
             return PackageList.Remove(item);
         }

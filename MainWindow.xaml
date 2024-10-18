@@ -3,11 +3,15 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:src="clr-namespace:LCModManager"
         mc:Ignorable="d"
         Title="LCModManager Alpha v1.0" 
         Height="Auto" 
         Width="Auto"
         d:DesignHeight="409.928" d:DesignWidth="569.813">
+    <Window.Resources>
+        <src:AppStateConverter x:Key="AppStateConverter" />
+    </Window.Resources>
     <Grid Background="FloralWhite">
         <Grid x:Name="Layout" Margin="0,0,0,15">
             <Grid.ColumnDefinitions>
@@ -65,6 +69,37 @@
             </Menu>
             <Frame x:Name="ViewFrame" Grid.Column="1" NavigationUIVisibility="Hidden"/>
         </Grid>
-        <StatusBar x:Name="StatusBar" VerticalAlignment="Bottom" Height="15" Margin="0,310,0,0" Grid.Row="1"/>
+        <StatusBar x:Name="StatusBar" VerticalAlignment="Bottom" HorizontalContentAlignment="Right" Height="22" Margin="0,310,0,0" Grid.Row="1">
+            <StatusBarItem HorizontalAlignment="Right">
+                <StackPanel Orientation="Horizontal">
+                    <ProgressBar 
+                        Name="ProgressBarControl" 
+                        Minimum="0"
+                        Maximum="100"
+                        Height="15"
+                        Width="100"
+                        Value="{Binding ProgressBarPosition, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}">
+                        <ProgressBar.Style>
+                            <Style TargetType="ProgressBar">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ProgressBarEnabled}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding ProgressBarEnabled}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ProgressBar.Style>
+                    </ProgressBar>
+                    <TextBlock 
+                        Margin="10,0,10,0" 
+                        MinWidth="50" 
+                        TextWrapping="NoWrap" 
+                        TextAlignment="Right" 
+                        Text="{Binding CurrentState, Converter={StaticResource AppStateConverter}}" />
+                </StackPanel>
+            </StatusBarItem>
+        </StatusBar>
     </Grid>
 </Window>
