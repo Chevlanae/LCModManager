@@ -267,7 +267,7 @@ namespace LCModManager
                         zip.ExtractToDirectory(versionDir); //extract zip
                         file.Close(); //close file
                         file.Dispose(); //release memory
-                        zip.Dispose(); 
+                        zip.Dispose();
                     }
                     catch (Exception ex)
                     {
@@ -369,7 +369,7 @@ namespace LCModManager
             static public string GameDir = GameDirectory.Find();
 
 
-            static public string InferModParentDirectory(Package package)
+            static public string InferModParentDirectory(ModEntrySelection package)
             {
                 List<string> childDirs = [];
 
@@ -407,7 +407,7 @@ namespace LCModManager
                 }
             }
 
-            static public void DeployMod(Package package)
+            static public void DeployMod(ModEntrySelection package)
             {
                 string selectedVersionPath = package.ModEntry.Path + "\\" + package.SelectedVersion;
 
@@ -436,7 +436,7 @@ namespace LCModManager
                 else
                 {
                     if (Directory.Exists(profileInstanceDir)) Directory.Delete(profileInstanceDir);
-                    foreach (Package package in profile.PackageList) DeployMod(package);
+                    foreach (ModEntrySelection package in profile.PackageList) DeployMod(package);
                 }
 
                 while (!File.Exists(GameDir + "\\" + "doorstop_config.ini")) await Task.Delay(100);
@@ -477,8 +477,8 @@ namespace LCModManager
             {
                 static private Dictionary<string, PackageListing> _Cache = new();
 
-                static public TimeSpan RefreshInterval = new TimeSpan(AppConfig.WebCacheRefreshInterval.Item1, 
-                                                                      AppConfig.WebCacheRefreshInterval.Item2, 
+                static public TimeSpan RefreshInterval = new TimeSpan(AppConfig.WebCacheRefreshInterval.Item1,
+                                                                      AppConfig.WebCacheRefreshInterval.Item2,
                                                                       AppConfig.WebCacheRefreshInterval.Item3);
 
                 static public DateTime LastRefresh = new FileInfo(PackageListCachePath).LastWriteTime;
@@ -487,8 +487,6 @@ namespace LCModManager
                 {
                     get
                     {
-                        if (_Cache.Count == 0) Refresh();
-
                         lock (_Cache)
                         {
                             return _Cache;
@@ -498,9 +496,9 @@ namespace LCModManager
 
                 PackageCache() { }
 
-                async public static void Refresh()
+                async static public Task Refresh(StatusBarControl statusBarControl)
                 {
-                    if((DateTime.Now - LastRefresh) > RefreshInterval) await WebClient.RefreshPackageListCache();
+                    if ((DateTime.Now - LastRefresh) > RefreshInterval) await WebClient.RefreshPackageListCache(statusBarControl);
 
                     if (await GetPackageList() is List<PackageListing> list)
                     {
@@ -529,9 +527,9 @@ namespace LCModManager
                 {
                     return PackageCache.Instance[fullName];
                 }
-                catch (Exception e)
+                catch (Exception ex)
                 {
-                    Debug.Write(e);
+                    Debug.Write(ex);
                     return null;
                 }
             }
@@ -546,6 +544,16 @@ namespace LCModManager
                 {
                     Debug.WriteLine(ex.Message);
                     return null;
+                }
+            }
+
+            async static public Task RefreshPackageListCache(StatusBarControl statusBarControl)
+            {
+                if (File.Exists(PackageListCachePath)) File.Delete(PackageListCachePath);
+
+                if (await DownloadPackageList() is HttpResponseMessage response)
+                {
+                    await statusBarControl.DownloadWithProgress(response, PackageListCachePath, AppState.RefreshingPackageList, false);
                 }
             }
 
@@ -565,7 +573,7 @@ namespace LCModManager
                     {
                         Debug.Write(ex);
                     }
-                    
+
                 }
             }
 
@@ -621,7 +629,7 @@ namespace LCModManager
                 {
                     PackageListingVersionEntry versionEntry = query.Value.versions.First(v => v.version_number == depParts[^1]);
 
-                    if(await DownloadPackage(versionEntry, completionOption) is HttpResponseMessage response)
+                    if (await DownloadPackage(versionEntry, completionOption) is HttpResponseMessage response)
                     {
                         return response;
                     }

@@ -33,7 +33,7 @@
                         <TranslateTransform X="20"/>
                     </TransformGroup>
                 </Menu.RenderTransform>
-                <MenuItem x:Name="ManageModsMenuItem" Header="Mods" Click="NavTo_ManageMods">
+                <MenuItem x:Name="ManageModsMenuItem" Header="Mods" ToolTip="Manage/Download Lethal Company mods" Click="NavTo_ManageMods">
                     <MenuItem.Style>
                         <Style TargetType="MenuItem">
                             <Style.Triggers>
@@ -44,7 +44,7 @@
                         </Style>
                     </MenuItem.Style>
                 </MenuItem>
-                <MenuItem x:Name="CreateProfileMenuItem" Header="Profiles" Click="NavTo_CreateProfile">
+                <MenuItem x:Name="CreateProfileMenuItem" Header="Profiles" ToolTip="Manage/Create shareable mod configurations" Click="NavTo_CreateProfile">
                     <MenuItem.Style>
                         <Style TargetType="MenuItem">
                             <Style.Triggers>
@@ -55,7 +55,7 @@
                         </Style>
                     </MenuItem.Style>
                 </MenuItem>
-                <MenuItem x:Name="LauncherMenuItem" Header="Launcher" Click="NavTo_Launcher">
+                <MenuItem x:Name="LauncherMenuItem" Header="Launcher" ToolTip="Launch the game with a selected profile" Click="NavTo_Launcher">
                     <MenuItem.Style>
                         <Style TargetType="MenuItem">
                             <Style.Triggers>
@@ -72,6 +72,12 @@
         <StatusBar x:Name="StatusBar" VerticalAlignment="Bottom" HorizontalContentAlignment="Right" Height="22" Margin="0,310,0,0" Grid.Row="1">
             <StatusBarItem HorizontalAlignment="Right">
                 <StackPanel Orientation="Horizontal">
+                    <TextBlock 
+                        Margin="10,0,10,0" 
+                        MinWidth="200" 
+                        TextWrapping="NoWrap" 
+                        TextAlignment="Right" 
+                        Text="{Binding Message}" />
                     <ProgressBar 
                         Name="ProgressBarControl" 
                         Minimum="0"

@@ -1,22 +1,23 @@
 ﻿using LCModManager.Thunderstore;
+using LCModManager.Thunderstore;
 using System.ComponentModel;
 using System.IO;
+using System.Timers;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-
-using LCModManager.Thunderstore;
-using System.Net.Http;
+using System;
 
 namespace LCModManager
 {
-
-
     public class StatusBarControl : INotifyPropertyChanged
     {
         private AppState _CurrentState;
         private string _Message;
+        private System.Timers.Timer _MessageTimer;
+        private int _MessageTimeoutMilliseconds;
         private bool _ProgressBarEnabled;
         private float _ProgressBarPosition;
 
@@ -25,7 +26,15 @@ namespace LCModManager
         public string Message
         {
             get { return _Message; }
-            set { _Message = value; OnPropertyChanged(); }
+            set
+            {
+                if((_Message = value) != "")
+                {
+                    _MessageTimer.Interval = _MessageTimeoutMilliseconds;
+                    _MessageTimer.Start();
+                }
+                OnPropertyChanged();
+            }
         }
         public AppState CurrentState
         {
@@ -47,6 +56,10 @@ namespace LCModManager
 
         public StatusBarControl()
         {
+            _MessageTimer = new();
+            _MessageTimer.Elapsed += (obj, args) => { Message = ""; _MessageTimer.Enabled = false; };
+            _MessageTimeoutMilliseconds = 3000;
+
             Message = "";
             CurrentState = AppState.Idle;
             Progress = new Progress<float>(p => ProgressBarPosition = p);
@@ -59,7 +72,7 @@ namespace LCModManager
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
-        async public Task<string?> DownloadWithProgress(string dependencyString)
+        async public Task<string?> DownloadWithProgress(string dependencyString, bool useExistingDownloads = true)
         {
             string[] depParts = dependencyString.Split("-");
 
@@ -69,7 +82,7 @@ namespace LCModManager
             {
                 PackageListingVersionEntry versionEntry = query.Value.versions.First(v => v.version_number == depParts[^1]);
 
-                if (await DownloadWithProgress(versionEntry) is string downloadLocation)
+                if (await DownloadWithProgress(versionEntry, useExistingDownloads) is string downloadLocation)
                 {
                     return downloadLocation;
                 }
@@ -78,53 +91,74 @@ namespace LCModManager
             else return null;
         }
 
-        async public Task<string?> DownloadWithProgress(PackageListingVersionEntry version)
+        async public Task<string?> DownloadWithProgress(PackageListingVersionEntry version, bool useExistingDownloads = true)
         {
             string destinationPath = AppConfig.DownloadStorePath + "\\" + version.full_name + ".zip";
 
-            CurrentState = AppState.DownloadingMod;
-            ProgressBarEnabled = true;
-            ProgressBarPosition = 0;
+            if (useExistingDownloads && File.Exists(destinationPath)) return destinationPath;
 
             using (HttpResponseMessage? response = await WebClient.DownloadPackage(version))
             {
                 if (response != null)
                 {
-                    using (Stream source = await response.Content.ReadAsStreamAsync())
+                    await DownloadWithProgress(response, destinationPath, AppState.DownloadingMod);
+
+                    return destinationPath;
+                }
+                else return null;
+            }
+        }
+
+        async public Task DownloadWithProgress(HttpResponseMessage response, string destinationPath, AppState state, bool progressBar = true)
+        {
+            CurrentState = state;
+
+            if (progressBar)
+            {
+                ProgressBarEnabled = true;
+                ProgressBarPosition = 0;
+            }
+
+            using (response)
+            {
+                using (Stream source = await response.Content.ReadAsStreamAsync())
+                {
+                    using (Stream destination = File.OpenWrite(destinationPath))
                     {
-                        using (Stream destination = File.OpenWrite(destinationPath))
+                        long? contentLength = response.Content.Headers.ContentLength;
+
+                        if (!contentLength.HasValue)
                         {
-                            long? contentLength = response.Content.Headers.ContentLength;
+                            await source.CopyToAsync(destination);
+                            Progress.Report(100);
+                        }
+                        else
+                        {
+                            byte[] buffer = new byte[81920];
+                            long totalBytesRead = 0;
+                            int bytesRead;
+                            CancellationToken cancellationToken = new CancellationToken();
 
-                            if (!contentLength.HasValue)
+                            while ((bytesRead = await source.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false)) != 0)
                             {
-                                await source.CopyToAsync(destination);
-                            }
-                            else
-                            {
-                                byte[] buffer = new byte[81920];
-                                long totalBytesRead = 0;
-                                int bytesRead;
-                                CancellationToken cancellationToken = new CancellationToken();
-
-                                while ((bytesRead = await source.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false)) != 0)
-                                {
-                                    await destination.WriteAsync(buffer, 0, bytesRead, cancellationToken).ConfigureAwait(false);
-                                    totalBytesRead += bytesRead;
-                                    Progress.Report(((float)totalBytesRead / contentLength.Value) * 100);
-                                }
+                                Message = "Downloading '" + response.RequestMessage.RequestUri + "'...";
+                                await destination.WriteAsync(buffer, 0, bytesRead, cancellationToken).ConfigureAwait(false);
+                                totalBytesRead += bytesRead;
+                                Progress.Report(((float)totalBytesRead / contentLength.Value) * 100);
                             }
                         }
                     }
                 }
-                else return null;
             }
 
             CurrentState = AppState.Idle;
-            ProgressBarEnabled = false;
-            ProgressBarPosition = 0;
+            Message = "";
 
-            return destinationPath;
+            if (progressBar)
+            {
+                ProgressBarEnabled = false;
+                ProgressBarPosition = 0;
+            }
         }
     }
 
@@ -150,6 +184,8 @@ namespace LCModManager
             NavTo_ManageMods();
 
             StatusBar.DataContext = StatusBarCtrl;
+
+            WebClient.PackageCache.Refresh(StatusBarCtrl);
         }
 
         private void NavTo_ManageMods()
@@ -173,6 +209,11 @@ namespace LCModManager
         {
             Launcher.RefreshProfiles();
             ViewFrame.Navigate(Launcher);
+        }
+
+        private async Task Refresh()
+        {
+
         }
     }
 }

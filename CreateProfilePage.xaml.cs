@@ -4,7 +4,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
-using System.Runtime.Intrinsics.Arm;
+using System.Runtime.Serialization;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
@@ -39,7 +39,7 @@ namespace LCModManager
             {
                 ModList.Clear();
 
-                foreach (Package package in profile.PackageList)
+                foreach (ModEntrySelection package in profile.PackageList)
                 {
                     try
                     {
@@ -85,11 +85,11 @@ namespace LCModManager
 
         private void CreateProfileButton_Click(object sender, RoutedEventArgs e)
         {
-            CreateProfileDialog dialog = new();
+            EnterTextDialog dialog = new("Create Profile", "Enter new profile name");
 
             if (dialog.ShowDialog() == true)
             {
-                ModProfile newProfile = new(dialog.NewProfileName.Text);
+                ModProfile newProfile = new(dialog.InputTextBox.Text);
 
                 if (!ProfileSelectorControl.Items.Contains(newProfile))
                 {
@@ -165,9 +165,9 @@ namespace LCModManager
                             package.Versions = [package.Versions[0]];
                         }
 
-                        Package state = new(package.Versions[0], package.ToModEntry());
+                        ModEntrySelection state = new(package.Versions[0], package.ToModEntry());
 
-                        if (!profile.Contains(state)) profile.Add(state);
+                        if (!profile.PackageList.Contains(state)) profile.PackageList.Add(state);
                     }
 
                     ProfileManager.SaveProfile(profile);
@@ -201,7 +201,7 @@ namespace LCModManager
             ResolveDependencies_Click(null, new RoutedEventArgs());
         }
 
-        private async void ResolveDependencies_Click(object sender, RoutedEventArgs e)
+        async private void ResolveDependencies_Click(object sender, RoutedEventArgs e)
         {
             if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
@@ -222,46 +222,99 @@ namespace LCModManager
                         }
                     }
 
-                    foreach(string dep in missingDependencies)
-                    {
-                        string[] depParts = dep.Split('-');
-                        string downloadPath = await _StatusBarControl.DownloadWithProgress(dep);
-
-                        if (downloadPath != null)
-                        {
-                            ModPackage? newPackage = await PackageManager.AddPackage(downloadPath);
-
-                            if (newPackage != null)
-                            {
-                                Package? existingState = profile.PackageList.Find(p => p.ModEntry.Author == depParts[0] &&
-                                                                                    p.ModEntry.Name == depParts[1]);
-
-                                if (existingState != null && !existingState.ModEntry.ExistsInPackageStore)
-                                {
-                                    existingState.SelectedVersion = depParts[2];
-                                    existingState.ModEntry = newPackage.ToModEntry();
-                                }
-                                else if (existingState == null)
-                                {
-                                    profile.Add(new Package(depParts[2], newPackage.ToModEntry()));
-                                }
-                            }
-                        }
-                    }
-
-                    ProfileManager.SaveProfile(profile);
-
-                    foreach (ModEntryDisplay item in ModList)
-                    {
-                        if (!item.ExistsInPackageStore)
-                        {
-                            _StatusBarControl.DownloadWithProgress(item.Versions[0]);
-                        }
-                    }
+                    await DownloadProfileDependencies(profile, missingDependencies.ToArray());
 
                     RefreshModList();
                 }
+
+                foreach (ModEntryDisplay item in ModList)
+                {
+                    if (!item.ExistsInPackageStore)
+                    {
+                        string fullName = item.Author + "-" + item.Name + "-" + item.Versions[0];
+
+                        if (await _StatusBarControl.DownloadWithProgress(fullName) is string download)
+                        {
+                            PackageManager.AddPackage(download);
+                        }
+                    }
+                }
+
+                RefreshModList();
             }
+
+            e.Handled = true;
+        }
+
+        async private Task DownloadProfileDependencies(ModProfile profile, string[] missingDependencies)
+        {
+            foreach (string dep in missingDependencies)
+            {
+                string[] depParts = dep.Split('-');
+
+                if (await _StatusBarControl.DownloadWithProgress(dep) is string downloadPath && await PackageManager.AddPackage(downloadPath) is ModPackage newPackage)
+                {
+                    ModEntrySelection? existingState = profile.PackageList.Find(p => p.ModEntry.Author == depParts[0] && p.ModEntry.Name == depParts[1]);
+
+                    if (existingState != null && !existingState.ModEntry.ExistsInPackageStore)
+                    {
+                        existingState.SelectedVersion = depParts[2];
+                        existingState.ModEntry = newPackage.ToModEntry();
+                    }
+                    else if (existingState == null)
+                    {
+                        profile.PackageList.Add(new ModEntrySelection(depParts[2], newPackage.ToModEntry()));
+                    }
+                }
+            }
+
+            ProfileManager.SaveProfile(profile);
+        }
+
+        private void ShareProfileButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ProfileSelectorControl.SelectedItem is ModProfile profile)
+            {
+                DataContractSerializer serializer = new(typeof(ModProfile));
+
+                using (MemoryStream stream = new())
+                {
+                    serializer.WriteObject(stream, profile);
+
+                    string text = Convert.ToBase64String(stream.ToArray());
+
+                    Clipboard.SetText(text);
+                }
+            }
+        }
+
+        private void ImportStringButton_Click(object sender, RoutedEventArgs e)
+        {
+            EnterTextDialog dialog = new("Import profile string", "Paste profile string here");
+            Regex base64Regex = new("^[-A-Za-z0-9+/]*={0,3}$");
+
+            if (dialog.ShowDialog() == true && base64Regex.IsMatch(dialog.InputTextBox.Text))
+            {
+                byte[] byteArray = Convert.FromBase64String(dialog.InputTextBox.Text);
+                DataContractSerializer serializer = new(typeof(ModProfile));
+
+                try
+                {
+                    using (MemoryStream stream = new(byteArray))
+                    {
+                        ModProfile newProfile = (ModProfile)serializer.ReadObject(stream);
+
+                        ProfileManager.AddProfile(newProfile);
+                        int position = ProfileSelectorControl.Items.Add(newProfile);
+                        ProfileSelectorControl.SelectedIndex = position;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.Write(ex);
+                }
+            }
+
 
             e.Handled = true;
         }

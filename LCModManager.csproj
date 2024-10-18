@@ -32,6 +32,7 @@
     <None Remove="Resources\PackageNotFound.png" />
     <None Remove="Resources\Problem-Icon.png" />
     <None Remove="Resources\RedXIcon.png" />
+    <None Remove="Resources\Share-Document-Icon.png" />
     <None Remove="Resources\TrashCan-Icon.png" />
     <None Remove="Resources\Warning-Icon.png" />
     <None Remove="Resources\Web-Icon.png" />
@@ -49,6 +50,7 @@
     <Resource Include="Resources\Dependencies-Icon.png" />
     <Resource Include="Resources\PackageNotFound.png" />
     <Resource Include="Resources\Problem-Icon.png" />
+    <Resource Include="Resources\Share-Document-Icon.png" />
     <Resource Include="Resources\TrashCan-Icon.png" />
   </ItemGroup>
 

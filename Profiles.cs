@@ -2,21 +2,22 @@
 using System.Globalization;
 using System.IO;
 using System.Runtime.Intrinsics.Arm;
+using System.Runtime.Serialization;
 using System.Windows.Data;
 using System.Xml.Serialization;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace LCModManager
 {
+    [DataContract]
     public class ModProfile
     {
-        public List<Package> PackageList = [];
+        [DataMember]
+        public List<ModEntrySelection> PackageList = [];
 
+        [DataMember]
         public string Name { get; set; }
 
-        public int Count => PackageList.Count;
-
-        public Package this[int index]
+        public ModEntrySelection this[int index]
         {
             get
             {
@@ -45,69 +46,9 @@ namespace LCModManager
             int i = 0;
             foreach (ModEntryDisplay mod in modList)
             {
-                this[i] = new Package(mod.SelectedVersions[0], mod.ToModEntry());
+                this[i] = mod.ToModEntrySelection(mod.SelectedVersions[0]);
                 i++;
             }
-        }
-
-        new public string ToString()
-        {
-            return Name;
-        }
-
-        public int IndexOf(Package item)
-        {
-            return PackageList.IndexOf(item);
-        }
-
-        public void Insert(int index, Package item)
-        {
-            PackageList.Insert(index, item);
-        }
-
-        public void RemoveAt(int index)
-        {
-            PackageList.RemoveAt(index);
-        }
-
-        internal void RemoveAll(Func<Package, bool> value)
-        {
-            List<Package> removedItems = [];
-
-            foreach (Package item in PackageList)
-            {
-                if (value(item)) removedItems.Add(item);
-            }
-
-            foreach (Package item in removedItems)
-            {
-                PackageList.Remove(item);
-            }
-        }
-
-        public void Add(Package item)
-        {
-            PackageList.Add(item);
-        }
-
-        public void Clear()
-        {
-            PackageList.Clear();
-        }
-
-        public bool Contains(Package item)
-        {
-            return PackageList.Contains(item);
-        }
-
-        public void CopyTo(Package[] array, int arrayIndex)
-        {
-            PackageList.CopyTo(array, arrayIndex);
-        }
-
-        public bool Remove(Package item)
-        {
-            return PackageList.Remove(item);
         }
     }
 
@@ -193,9 +134,11 @@ namespace LCModManager
 
         static public void DeleteProfile(ModProfile profile)
         {
-            string path = AppConfig.ProfileStorePath + "\\" + profile.Name + ".xml";
+            string filePath = AppConfig.ProfileStorePath + "\\" + profile.Name + ".xml";
+            string directoryPath = AppConfig.ProfileStorePath + "\\" + profile.Name;
 
-            if (File.Exists(path)) File.Delete(path);
+            if (File.Exists(filePath)) File.Delete(filePath);
+            if (Directory.Exists(directoryPath)) Directory.Delete(directoryPath, true);
         }
     }
 }

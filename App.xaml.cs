@@ -15,7 +15,6 @@ namespace LCModManager
         public App()
         {
             AppConfig.CreateDataStores();
-            WebClient.PackageCache.Refresh();
         }
 
         private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)

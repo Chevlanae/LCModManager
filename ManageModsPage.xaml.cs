@@ -45,7 +45,7 @@ namespace LCModManager
 
         private void AddPackage_Click(object sender, RoutedEventArgs e)
         {
-
+            _StatusBarControl.CurrentState = AppState.AddingModPackage;
 
             OpenFileDialog dialog = new()
             {
@@ -57,17 +57,16 @@ namespace LCModManager
 
             if (dialog.ShowDialog() == true && dialog.FileNames.Length > 0)
             {
-                _StatusBarControl.CurrentState = AppState.AddingModPackage;
-
                 foreach (string filename in dialog.FileNames)
                 {
+                    _StatusBarControl.Message = "Adding mod package '" + filename.Split("\\")[^1] + "'...";
                     PackageManager.AddPackage(filename);
                 }
 
-                _StatusBarControl.CurrentState = AppState.Idle;
-
                 RefreshModList();
             }
+
+            _StatusBarControl.CurrentState = AppState.Idle;
 
             e.Handled = true;
         }
@@ -78,6 +77,7 @@ namespace LCModManager
 
             foreach (ModPackage package in ModListControl.SelectedItems)
             {
+                _StatusBarControl.Message = "Removing mod package from '" + package.Name + "'...";
                 PackageManager.RemovePackage(package);
             }
 
@@ -95,22 +95,26 @@ namespace LCModManager
             {
                 foreach (ModEntryDisplay selectedItem in window.ModListControl.SelectedItems)
                 {
+                    if (selectedItem.SelectedVersions.Count == 0)
+                    {
+                        selectedItem.SelectedVersions.Add(selectedItem.Versions[0]);
+                    }
+
                     string packageKey = selectedItem.Author + "-" + selectedItem.Name;
 
-                    if (selectedItem.SelectedVersions.Count > 0)
+                    foreach (string version in selectedItem.SelectedVersions)
                     {
-                        foreach (string version in selectedItem.SelectedVersions)
+                        if 
+                        (
+                            WebClient.GetCachedPackage(packageKey) is PackageListing listing &&
+                            await _StatusBarControl.DownloadWithProgress(listing.versions.First(v => v.version_number == version)) is string downloadPath
+                        )
                         {
-                            string? downloadPath = await _StatusBarControl.DownloadWithProgress(window.QueriedPackages[packageKey].versions.First(v => v.version_number == version));
-
-                            if (downloadPath != null) PackageManager.AddPackage(downloadPath);
+                            _StatusBarControl.CurrentState = AppState.AddingModPackage;
+                            _StatusBarControl.Message = "Adding mod package '" + downloadPath.Split("\\")[^1] + "'...";
+                            PackageManager.AddPackage(downloadPath);
+                            _StatusBarControl.CurrentState = AppState.Idle;
                         }
-                    }
-                    else
-                    {
-                        string? downloadPath = await _StatusBarControl.DownloadWithProgress(window.QueriedPackages[packageKey].versions[0]);
-
-                        if (downloadPath != null) PackageManager.AddPackage(downloadPath);
                     }
                 }
             }
@@ -155,7 +159,13 @@ namespace LCModManager
                                     {
                                         string destinationPath = await _StatusBarControl.DownloadWithProgress(v);
 
-                                        if (File.Exists(destinationPath)) PackageManager.AddPackage(destinationPath);
+                                        if (File.Exists(destinationPath))
+                                        {
+                                            _StatusBarControl.CurrentState = AppState.AddingModPackage;
+                                            _StatusBarControl.Message = "Adding mod package '" + destinationPath.Split("\\")[^1] + "'...";
+                                            PackageManager.AddPackage(destinationPath);
+                                            _StatusBarControl.CurrentState = AppState.Idle;
+                                        }
 
                                         break;
                                     }

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -41,7 +42,6 @@ namespace LCModManager
             if (QueryTextBox.Text.Length < 2) return;
 
             ModList.Clear();
-            QueriedPackages.Clear();
 
             Regex reg = new(Regex.Escape(QueryTextBox.Text), RegexOptions.IgnoreCase);
 
@@ -50,7 +50,6 @@ namespace LCModManager
                 ModPackage newPackage = new ModPackage(listing);
                 newPackage.Website = listing.package_url;
                 ModList.Add(newPackage);
-                QueriedPackages[listing.full_name] = listing;
             }
 
             ItemCountTextBlock.Text = "Returned " + ModList.Count.ToString() + " Results";
