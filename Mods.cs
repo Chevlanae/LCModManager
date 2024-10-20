@@ -98,7 +98,7 @@ namespace LCModManager
                     string name = depStrParts[^2];
                     string version = depStrParts[^1];
 
-                    List<ModEntryDisplay> foundDependencies = modlist.FindAll(e => e.Name == name);
+                    List<ModEntryDisplay> foundDependencies = modlist.FindAll(e => e.Name == name && e.Author == owner);
 
                     switch (foundDependencies.Count)
                     {

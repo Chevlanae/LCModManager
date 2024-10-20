@@ -1,14 +1,13 @@
 ﻿using LCModManager.Thunderstore;
-using LCModManager.Thunderstore;
+using System;
 using System.ComponentModel;
 using System.IO;
-using System.Timers;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
+using System.Timers;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
-using System;
 
 namespace LCModManager
 {
@@ -28,7 +27,7 @@ namespace LCModManager
             get { return _Message; }
             set
             {
-                if((_Message = value) != "")
+                if ((_Message = value) != "")
                 {
                     _MessageTimer.Interval = _MessageTimeoutMilliseconds;
                     _MessageTimer.Start();

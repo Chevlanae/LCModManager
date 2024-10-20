@@ -43,7 +43,7 @@ namespace LCModManager
             foreach (ModEntryDisplay mod in ModList) mod.ProcessDependencies(ModList.ToList());
         }
 
-        private void AddPackage_Click(object sender, RoutedEventArgs e)
+        async private void AddPackage_Click(object sender, RoutedEventArgs e)
         {
             _StatusBarControl.CurrentState = AppState.AddingModPackage;
 
@@ -60,7 +60,7 @@ namespace LCModManager
                 foreach (string filename in dialog.FileNames)
                 {
                     _StatusBarControl.Message = "Adding mod package '" + filename.Split("\\")[^1] + "'...";
-                    PackageManager.AddPackage(filename);
+                    await PackageManager.AddPackage(filename);
                 }
 
                 RefreshModList();
@@ -71,14 +71,14 @@ namespace LCModManager
             e.Handled = true;
         }
 
-        private void RemovePackage_Click(object sender, RoutedEventArgs e)
+        async private void RemovePackage_Click(object sender, RoutedEventArgs e)
         {
             _StatusBarControl.CurrentState = AppState.RemovingModPackage;
 
             foreach (ModPackage package in ModListControl.SelectedItems)
             {
                 _StatusBarControl.Message = "Removing mod package from '" + package.Name + "'...";
-                PackageManager.RemovePackage(package);
+                await PackageManager.RemovePackage(package);
             }
 
             _StatusBarControl.CurrentState = AppState.Idle;
@@ -89,7 +89,7 @@ namespace LCModManager
 
         async private void WebPackage_Click(object sender, RoutedEventArgs e)
         {
-            WebClientWindow window = new(_StatusBarControl);
+            WebClientWindow window = new();
 
             if (window.ShowDialog() == true)
             {
@@ -171,10 +171,24 @@ namespace LCModManager
                                     }
                                 }
                             }
+
+                            catch(KeyNotFoundException ex)
+                            {
+                                Debug.Write(ex);
+
+                                ErrorPopupWindow errorPopup = new("Dependency '" + dep + "'" + " was not found in Thunderstore package list.", ex, "Error downloading dependency for '" + entry.Name + "'");
+                                errorPopup.Show();
+
+                                goto EndOfFunction;
+                            }
                             catch (Exception ex)
                             {
                                 Debug.Write(ex);
-                                Debug.WriteLine(dep + "not found in package cache");
+
+                                ErrorPopupWindow errorPopup = new("An error occured while downloading '" + dep + "'", ex);
+                                errorPopup.Show();
+
+                                goto EndOfFunction;
                             }
                         }
                     }
@@ -183,6 +197,7 @@ namespace LCModManager
                 RefreshModList();
             }
 
+            EndOfFunction:
             e.Handled = true;
         }
 

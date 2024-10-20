@@ -6,8 +6,7 @@
       xmlns:local="clr-namespace:LCModManager" 
       mc:Ignorable="d" 
       d:DesignHeight="1080" d:DesignWidth="1920"
-      x:Name="Mods"
-      Title="Manage Mods">
+      x:Name="Mods">
     <Grid>
         <ToolBar ToolBarTray.IsLocked="True" VerticalAlignment="Top" Height="40" FontSize="12" Grid.ColumnSpan="2">
             <Button x:Name="AddPackage" ToolTip="Add mod from file" Click="AddPackage_Click" Style="{StaticResource ToolBarButton}">

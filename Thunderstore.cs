@@ -86,8 +86,6 @@ namespace LCModManager
             {
                 Path = sourcePath;
 
-                string[] versions;
-
                 foreach (string versionPath in Directory.GetDirectories(sourcePath).OrderDescending().ToArray())
                 {
                     Versions.Add(versionPath.Split("\\").Last());
@@ -250,7 +248,7 @@ namespace LCModManager
                 string owner = nameparts[^3]; //package owner
                 string name = nameparts[^2]; //package name
                 string version = nameparts[^1]; //package version
-                string nameDir = StorePath + "\\" + name; //destination directory in package store
+                string nameDir = StorePath + "\\" + owner + "-" + name; //destination directory in package store
                 string versionDir = nameDir + "\\" + version; //package path in destination directory
 
                 if (!Directory.Exists(nameDir)) Directory.CreateDirectory(nameDir); //if nameDir does not exist, create nameDir
@@ -297,10 +295,10 @@ namespace LCModManager
                 else return null;
             }
 
-            static public void RemovePackage(ModEntryDisplay package)
+            async static public Task RemovePackage(ModEntryDisplay package)
             {
                 // for each package who's name matches package.Name
-                foreach (ModPackage p in GetPackages().Where(p => p.Name == package.Name))
+                foreach (ModPackage p in GetPackages().Where(p => p.Name == package.Name && p.Author == package.Author))
                 {
                     // if no versions are selected, or all versions are selected, delete the entire package directory
                     if (package.SelectedVersions.Count == 0 || package.SelectedVersions.Count == package.Versions.Count)
@@ -320,9 +318,9 @@ namespace LCModManager
                 }
             }
 
-            static public void RemovePackages(IEnumerable<ModEntryDisplay> packages)
+            async static public Task RemovePackages(IEnumerable<ModEntryDisplay> packages)
             {
-                foreach (ModEntryDisplay p in packages) RemovePackage(p);
+                foreach (ModEntryDisplay p in packages) await RemovePackage(p);
             }
 
             static public List<ModPackage> GetPackages()
