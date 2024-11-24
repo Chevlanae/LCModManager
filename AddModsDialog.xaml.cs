@@ -11,7 +11,7 @@ namespace LCModManager
     /// </summary>
     public partial class AddModsDialog : Window
     {
-        public ObservableCollection<ModEntryDisplay> ModList = new(PackageManager.GetPackages());
+        public ObservableCollection<IModEntry> ModList;
 
         public AddModsDialog()
         {
@@ -20,16 +20,16 @@ namespace LCModManager
             ModListControl.ItemsSource = ModList;
         }
 
-        public AddModsDialog(IList<ModEntryDisplay> existingEntries)
+        public AddModsDialog(IList<IModEntry> existingEntries)
         {
             InitializeComponent();
 
             ModList = [];
 
-            foreach (ModEntryDisplay package in PackageManager.GetPackages())
+            foreach (IModEntry mod in PackageManager.GetMods())
             {
-                if (existingEntries.Any(e => e.Name == package.Name && e.Author == package.Author)) continue;
-                else ModList.Add(package);
+                if (existingEntries.Any(e => e.Name == mod.Name && e.Author == mod.Author)) continue;
+                else ModList.Add(mod);
             }
 
             ModListControl.ItemsSource = ModList;
@@ -56,12 +56,12 @@ namespace LCModManager
 
         private void VersionListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (sender is ListView list && list.DataContext is ModEntryDisplay entry)
+            if (sender is ListView list && list.DataContext is IModEntry mod)
             {
-                entry.SelectedVersions.Clear();
+                mod.SelectedVersions.Clear();
                 foreach (string version in list.SelectedItems)
                 {
-                    entry.SelectedVersions.Add(version);
+                    mod.SelectedVersions.Add(version);
                 }
             }
 

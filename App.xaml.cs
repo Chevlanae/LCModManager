@@ -12,10 +12,7 @@ namespace LCModManager
     /// </summary>
     public partial class App : Application
     {
-        public App()
-        {
-            AppConfig.CreateDataStores();
-        }
+        public App() { }
 
         private void Hyperlink_RequestNavigate(object sender, RequestNavigateEventArgs e)
         {

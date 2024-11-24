@@ -3,16 +3,13 @@ using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
-using System.Net;
 using System.Net.Http;
-using System.Runtime.CompilerServices;
-using System.Security.Cryptography.X509Certificates;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using System.Windows.Documents;
 using System.Windows.Media.Imaging;
-using System.Xml.Serialization;
+using Path = System.IO.Path;
 
 namespace LCModManager
 {
@@ -38,7 +35,25 @@ namespace LCModManager
             }
         }
 
-        public struct PackageListingVersionEntry
+        public struct PackageListing
+        {
+            public string name { get; set; }
+            public string full_name { get; set; }
+            public string owner { get; set; }
+            public string package_url { get; set; }
+            public string donation_link { get; set; }
+            public string date_created { get; set; }
+            public string date_updated { get; set; }
+            public string uuid4 { get; set; }
+            public int rating_score { get; set; }
+            public bool is_pinned { get; set; }
+            public bool is_deprecated { get; set; }
+            public bool has_nsfw_content { get; set; }
+            public string[] categories { get; set; }
+            public PackageListingVersion[] versions { get; set; }
+        }
+
+        public struct PackageListingVersion
         {
             public string name { get; set; }
             public string full_name { get; set; }
@@ -55,82 +70,98 @@ namespace LCModManager
             public long file_size { get; set; }
         }
 
-        public struct PackageListing
-        {
-            public string name { get; set; }
-            public string full_name { get; set; }
-            public string owner { get; set; }
-            public string package_url { get; set; }
-            public string donation_link { get; set; }
-            public string date_created { get; set; }
-            public string date_updated { get; set; }
-            public string uuid4 { get; set; }
-            public int rating_score { get; set; }
-            public bool is_pinned { get; set; }
-            public bool is_deprecated { get; set; }
-            public bool has_nsfw_content { get; set; }
-            public string[] categories { get; set; }
-            public PackageListingVersionEntry[] versions { get; set; }
-        }
-
-        internal class ModPackage : ModEntryDisplay
+        [DataContract]
+        public class Mod : ModPackage
         {
             private string? _ReadMe;
             private string? _ChangeLog;
-            private ModManifest _Manifest;
+            private ModManifest? _Manifest;
 
             public string? ReadMe => _ReadMe;
             public string? ChangeLog => _ChangeLog;
 
-            public ModPackage(string sourcePath)
+            public override void FromUri(Uri uri)
             {
-                Path = sourcePath;
-
-                foreach (string versionPath in Directory.GetDirectories(sourcePath).OrderDescending().ToArray())
+                //uri is a file path, and is a local path that points to an existing file
+                if (uri.IsFile && uri.IsLoopback && File.Exists(uri.LocalPath))
                 {
-                    Versions.Add(versionPath.Split("\\").Last());
-                }
+                    SourceName = Path.GetDirectoryName(uri.LocalPath).Split("\\")[^1];
 
-                string selectedVersionPath = Path + "\\" + Versions[0];
+                    using (ZipArchive zip = ZipFile.OpenRead(uri.LocalPath))
+                    {
+                        foreach (ZipArchiveEntry entry in zip.Entries)
+                        {
+                            switch (entry.Name)
+                            {
+                                case "README.md":
+                                    using (StreamReader file = new(entry.Open()))
+                                    {
+                                        _ReadMe = file.ReadToEnd();
+                                    }
+                                    break;
 
-                try
-                {
-                    _ReadMe = File.ReadAllText(selectedVersionPath + "\\README.md");
-                }
-                catch
-                {
-                    _ReadMe = null;
-                }
+                                case "CHANGELOG.md":
+                                    using (StreamReader file = new(entry.Open()))
+                                    {
+                                        _ChangeLog = file.ReadToEnd();
+                                    }
+                                    break;
 
-                try
-                {
-                    _ChangeLog = File.ReadAllText(selectedVersionPath + "\\CHANGELOG.md");
-                }
-                catch
-                {
-                    _ChangeLog = null;
-                }
+                                case "icon.png":
+                                    using (Stream file = entry.Open())
+                                    using (MemoryStream stream = new())
+                                    {
+                                        file.CopyTo(stream);
+                                        stream.Position = 0;
 
+                                        Icon = new BitmapImage();
+                                        Icon.BeginInit();
+                                        Icon.StreamSource = stream;
+                                        Icon.DecodePixelWidth = 64;
+                                        Icon.DecodePixelHeight = 64;
+                                        Icon.CacheOption = BitmapCacheOption.OnLoad;
+                                        Icon.EndInit();
+                                    }
+                                    break;
+
+                                case "manifest.json":
+                                    using (StreamReader file = new(entry.Open()))
+                                    {
+                                        _Manifest = new ModManifest(file.ReadToEnd(), new(JsonSerializerDefaults.Web));
+                                    }
+
+                                    Name = _Manifest?.Name ?? "";
+                                    Description = _Manifest?.Description;
+                                    Website = _Manifest?.Website_Url;
+                                    Dependencies = _Manifest?.Dependencies;
+
+                                    break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            public override void FromModEntry(IModEntry modEntry)
+            {
                 Icon = new BitmapImage();
                 Icon.BeginInit();
-                Icon.UriSource = new Uri(selectedVersionPath + "\\icon.png");
+                Icon.UriSource = new Uri("pack://application:,,,/Resources/PackageNotFound.png");
                 Icon.DecodePixelWidth = 64;
                 Icon.DecodePixelHeight = 64;
                 Icon.CacheOption = BitmapCacheOption.OnLoad;
                 Icon.EndInit();
-
-                _Manifest = new ModManifest(File.ReadAllText(selectedVersionPath + "\\manifest.json"), new(JsonSerializerDefaults.Web));
-                Name = _Manifest.Name ?? "";
-                Author = _Manifest.Author ?? "";
-                Description = _Manifest.Description;
-                Website = _Manifest.Website_Url;
-                Dependencies = _Manifest.Dependencies;
-                ExistsInPackageStore = true;
+                SourceName = modEntry.SourceName;
+                Name = modEntry.Name;
+                Author = modEntry.Author;
+                Description = modEntry.Description;
+                Versions = modEntry.Versions;
+                Website = modEntry.Website;
+                Dependencies = modEntry.Dependencies;
             }
 
-            public ModPackage(PackageListing listing)
+            public void FromPackageListing(PackageListing listing)
             {
-                Path = listing.package_url;
                 Icon = new BitmapImage();
                 Icon.BeginInit();
                 Icon.UriSource = new Uri(listing.versions[0].icon);
@@ -145,9 +176,9 @@ namespace LCModManager
                 Versions = [];
                 Dependencies = [];
 
-                foreach (PackageListingVersionEntry entry in listing.versions)
+                foreach (PackageListingVersion entry in listing.versions)
                 {
-                    Versions.Add(entry.version_number);
+                    Versions.Add(entry.version_number, new Uri(entry.download_url));
 
                     foreach (string dep in entry.dependencies)
                     {
@@ -155,209 +186,160 @@ namespace LCModManager
                     }
                 }
             }
-
-            public ModPackage(PackageListing listing, string selectedVersion)
-            {
-                PackageListingVersionEntry entry = listing.versions.First(v => v.version_number == selectedVersion);
-
-                Path = entry.download_url;
-                Icon = new BitmapImage();
-                Icon.BeginInit();
-                Icon.UriSource = new Uri(entry.icon);
-                Icon.DecodePixelWidth = 64;
-                Icon.DecodePixelHeight = 64;
-                Icon.CacheOption = BitmapCacheOption.OnLoad;
-                Icon.EndInit();
-                Name = entry.name;
-                Author = listing.owner;
-                Description = entry.description;
-                Versions = [entry.version_number];
-                Website = entry.website_url;
-                Dependencies = entry.dependencies;
-            }
-
-            public ModPackage(PackageListingVersionEntry entry)
-            {
-                Path = entry.download_url;
-                Icon = new BitmapImage();
-                Icon.BeginInit();
-                Icon.UriSource = new Uri(entry.icon);
-                Icon.DecodePixelWidth = 64;
-                Icon.DecodePixelHeight = 64;
-                Icon.CacheOption = BitmapCacheOption.OnLoad;
-                Icon.EndInit();
-                Name = entry.name;
-                Description = entry.description;
-                Versions = [entry.version_number];
-                Website = entry.website_url;
-                Dependencies = entry.dependencies;
-            }
-
-            public ModPackage(ModEntry entry, bool notFound = false)
-            {
-                if (notFound)
-                {
-                    Path = entry.Path;
-                    Icon = new BitmapImage();
-                    Icon.BeginInit();
-                    Icon.UriSource = new Uri("pack://application:,,,/Resources/PackageNotFound.png");
-                    Icon.DecodePixelWidth = 64;
-                    Icon.DecodePixelHeight = 64;
-                    Icon.CacheOption = BitmapCacheOption.OnLoad;
-                    Icon.EndInit();
-                    Name = entry.Name;
-                    Description = entry.Description;
-                    Versions = entry.Versions;
-                    Website = entry.Website;
-                    Dependencies = entry.Dependencies;
-                    ExistsInPackageStore = false;
-                }
-                else
-                {
-                    Path = entry.Path;
-                    Icon = null;
-                    Name = entry.Name;
-                    Description = entry.Description;
-                    Versions = entry.Versions;
-                    Website = entry.Website;
-                    Dependencies = entry.Dependencies;
-                    ExistsInPackageStore = false;
-                }
-            }
         }
 
         static internal class PackageManager
         {
-            static public string StorePath = AppConfig.PackageStorePath + "\\Thunderstore";
+            static public string StorePath = AppConfig.PackageStores["Thunderstore"].LocalPath;
 
             //Filename regex used primarily for AddPackage()
             static private Regex WinDuplicateFileReg = new("\\([0-9]+\\)\\.[a-zA-Z0-9]+$", RegexOptions.Compiled);
-            static private Regex WinDuplicateDirReg = new("\\([0-9]+\\)$", RegexOptions.Compiled);
             static private Regex FileExtensionReg = new("\\.[a-zA-Z0-9]+$", RegexOptions.Compiled);
             static private Regex PackageNameReg = new(".*-.+\\..+\\..+", RegexOptions.Compiled);
-            static private Regex PackageSourceFluffReg = new(WinDuplicateFileReg + "|" + WinDuplicateDirReg + "|" + FileExtensionReg, RegexOptions.Compiled);
+            static private Regex PackageSourceFluffReg = new(WinDuplicateFileReg + "|" + FileExtensionReg, RegexOptions.Compiled);
 
-            async static public Task<ModPackage?> AddPackage(string packageSourcePath)
+            static private Mod GetModFromPath(string localPath)
             {
-                string sourceName = packageSourcePath.Split("\\").Last(); //lop off path
+                Mod mod = new();
 
-                string[] nameparts = sourceName[..^(PackageSourceFluffReg.Match(sourceName).Length)].Split("-"); //Lop off file extension and/or duplicate file patterns, then split string at each "-"
+                mod.FromLocalPath(localPath);
 
-                if (nameparts.Length != 3 || !PackageNameReg.IsMatch(sourceName)) return null; //return null if sourceName does not match desired format
+                mod.Author = Path.GetFileNameWithoutExtension(localPath).Split("-")[0];
 
-                string owner = nameparts[^3]; //package owner
-                string name = nameparts[^2]; //package name
-                string version = nameparts[^1]; //package version
-                string nameDir = StorePath + "\\" + owner + "-" + name; //destination directory in package store
-                string versionDir = nameDir + "\\" + version; //package path in destination directory
+                return mod;
+            }
 
-                if (!Directory.Exists(nameDir)) Directory.CreateDirectory(nameDir); //if nameDir does not exist, create nameDir
-                if (Directory.Exists(versionDir)) Directory.Delete(versionDir, true); //if versionDir already exists, delete versionDir
+            async static public Task<IModEntry?> AddMod(string sourcePath)
+            {
+                string sourceFilename = sourcePath.Split("\\").Last(); //lop off path
 
-                if (File.Exists(packageSourcePath))
+                string[] nameparts = sourceFilename[..^(PackageSourceFluffReg.Match(sourceFilename).Length)].Split("-"); //Lop off file extension and/or duplicate file patterns, then split string at each "-"
+
+                if (nameparts.Length != 3 || !PackageNameReg.IsMatch(sourceFilename)) return null; //return null if sourceName does not match desired format
+
+                if (File.Exists(sourcePath))
                 {
-                    //unzip file at packageSourcePath and extract to versionDir
                     try
                     {
-                        File.SetAttributes(packageSourcePath, FileAttributes.Normal); // ensure correct file permissions
-                        using Stream file = File.Open(packageSourcePath, FileMode.Open, FileAccess.Read); //open read stream
-                        using ZipArchive zip = new(file); //unzip file
-                        zip.ExtractToDirectory(versionDir); //extract zip
-                        file.Close(); //close file
-                        file.Dispose(); //release memory
-                        zip.Dispose();
+                        string newFilename = StorePath + String.Join("-", nameparts) + ".zip";
+
+                        if(!File.Exists(newFilename)) File.Copy(sourcePath, newFilename, true);
+
+                        return GetModFromPath(newFilename);
                     }
                     catch (Exception ex)
                     {
                         Debug.Write(ex);
                         return null;
                     }
-
-                    //set manifest author and return new ModPackage class derived from versionDir
-                    try
-                    {
-                        string manifestPath = versionDir + "\\manifest.json";
-                        ModManifest manifest = new(File.ReadAllText(manifestPath), new(JsonSerializerDefaults.Web));
-                        manifest.Author = owner;
-                        File.WriteAllBytes(manifestPath, JsonSerializer.SerializeToUtf8Bytes<ModManifest>(manifest));
-
-                        return new ModPackage(nameDir);
-                    }
-
-                    //Delete directory if there is a raised exception
-                    catch (Exception ex)
-                    {
-                        Directory.Delete(nameDir, true);
-                        Debug.WriteLine(ex);
-                        return null;
-                    }
                 }
                 else return null;
             }
 
-            async static public Task RemovePackage(ModEntryDisplay package)
+            static public List<IModEntry> GetMods()
             {
-                // for each package who's name matches package.Name
-                foreach (ModPackage p in GetPackages().Where(p => p.Name == package.Name && p.Author == package.Author))
-                {
-                    // if no versions are selected, or all versions are selected, delete the entire package directory
-                    if (package.SelectedVersions.Count == 0 || package.SelectedVersions.Count == package.Versions.Count)
-                    {
-                        Directory.Delete(p.Path, true);
-                    }
+                List<IModEntry> mods = [];
 
-                    // else delete each directory for selected versions in package
+                foreach (string file in Directory.GetFiles(StorePath))
+                {
+                    string[] nameparts = Path.GetFileNameWithoutExtension(file).Split("-");
+
+                    if (mods.Find(m => m.Author == nameparts[0] && m.Name == nameparts[1]) is Mod existingMod)
+                    {
+                        existingMod.Versions.Add(nameparts[2], new Uri(file));
+                    }
                     else
                     {
-                        foreach (string version in package.SelectedVersions)
+                        Mod newMod = GetModFromPath(file);
+
+                        newMod.Versions.Add(nameparts[2], new Uri(file));
+
+                        mods.Add(newMod);
+                    }
+                }
+
+                return mods;
+            }
+
+            static public List<IModEntry> GetMods(string name)
+            {
+                Regex regex = new Regex(name);
+                List<IModEntry> mods = [];
+
+                foreach (string file in Directory.GetFiles(StorePath).Where(path => regex.IsMatch(path)))
+                {
+                    string[] nameparts = Path.GetFileNameWithoutExtension(file).Split("-");
+
+                    if (mods.Find(m => m.Author == nameparts[0] && m.Name == nameparts[1]) is Mod existingMod)
+                    {
+                        existingMod.Versions.Add(nameparts[2], new Uri(file));
+                    }
+                    else
+                    {
+                        Mod newMod = GetModFromPath(file);
+
+                        newMod.Versions.Add(nameparts[0], new Uri(file));
+
+                        mods.Add(newMod);
+                    }
+                }
+
+                return mods;
+            }
+
+            static public List<IModEntry> GetMods(Regex regex)
+            {
+                List<IModEntry> mods = [];
+
+                foreach (string file in Directory.GetFiles(StorePath).Where(path => regex.IsMatch(path)))
+                {
+                    string[] nameparts = Path.GetFileNameWithoutExtension(file).Split("-");
+
+                    if (mods.Find(m => m.Author == nameparts[0] && m.Name == nameparts[1]) is Mod existingMod)
+                    {
+                        existingMod.Versions.Add(nameparts[2], new Uri(file));
+                    }
+                    else
+                    {
+                        Mod newMod = GetModFromPath(file);
+
+                        newMod.Versions.Add(nameparts[0], new Uri(file));
+
+                        mods.Add(newMod);
+                    }
+                }
+
+                return mods;
+            }
+
+            async static public Task RemoveMod(IModEntry mod)
+            {
+                // for each package who's name matches package.Name
+                foreach (Mod m in GetMods().Where(p => p.Name == mod.Name && p.Author == mod.Author))
+                {
+                    // if no versions are selected, or all versions are selected, delete every version
+                    if (mod.SelectedVersions.Count == 0 || mod.SelectedVersions.Count == mod.Versions.Count)
+                    {
+                        foreach (KeyValuePair<string, Uri> v in mod.Versions)
                         {
-                            string versionPath = Path.Combine(p.Path, version);
-                            if (Directory.Exists(versionPath)) Directory.Delete(versionPath, true);
+                            if (File.Exists(v.Value.AbsolutePath)) File.Delete(v.Value.AbsolutePath);
+                        }
+                    }
+                    else
+                    {
+                        foreach (string version in mod.SelectedVersions)
+                        {
+                            string path = mod.Versions[version].AbsolutePath;
+
+                            if (File.Exists(path)) File.Delete(path);
                         }
                     }
                 }
             }
 
-            async static public Task RemovePackages(IEnumerable<ModEntryDisplay> packages)
+            async static public Task RemoveMods(IEnumerable<IModEntry> packages)
             {
-                foreach (ModEntryDisplay p in packages) await RemovePackage(p);
-            }
-
-            static public List<ModPackage> GetPackages()
-            {
-                List<ModPackage> packages = [];
-
-                foreach (string directory in Directory.GetDirectories(StorePath))
-                {
-                    packages.Add(new ModPackage(directory));
-                }
-
-                return packages;
-            }
-
-            static public List<ModPackage> GetPackages(string name)
-            {
-                Regex regex = new Regex(name);
-                List<ModPackage> packages = [];
-
-                foreach (string file in Directory.GetDirectories(StorePath).Where(path => regex.IsMatch(path)))
-                {
-                    packages.Add(new ModPackage(file));
-                }
-
-                return packages;
-            }
-
-            static public List<ModPackage> GetPackages(Regex regex)
-            {
-                List<ModPackage> packages = [];
-
-                foreach (string file in Directory.GetDirectories(StorePath).Where(path => regex.IsMatch(path)))
-                {
-                    packages.Add(new ModPackage(file));
-                }
-
-                return packages;
+                foreach (Mod m in packages) await RemoveMod(m);
             }
         }
 
@@ -365,121 +347,144 @@ namespace LCModManager
         {
             //find Lethal Company game directory on system
             static public string GameDir = GameDirectory.Find();
-
-
-            static public string InferModParentDirectory(ModEntrySelection package)
+            static public class RegularExpressions
             {
-                List<string> childDirs = [];
-
-                foreach (string dir in Directory.GetDirectories(package.ModEntry.Path + "\\" + package.SelectedVersion))
-                {
-                    childDirs.Add(dir.Split("\\")[^1]);
-                }
-
-                switch (childDirs.Count)
-                {
-                    case 0: return GameDir + "\\BepInEx\\plugins";
-                    case 1:
-                        return childDirs[0] switch
-                        {
-                            "BepInEx" => GameDir,
-                            "BepInExPack" => GameDir,
-                            _ => GameDir + "\\BepInEx",
-                        };
-                    default:
-                        string? inferredDir = null;
-
-                        foreach (string dir in childDirs)
-                        {
-                            inferredDir = dir switch
-                            {
-                                "BepInEx" => GameDir,
-                                "plugins" => GameDir + "\\BepInEx",
-                                _ => null
-                            };
-
-                            if (inferredDir != null) break;
-                        }
-
-                        return inferredDir ?? GameDir + "\\BepInEx";
-                }
+                static public Regex BepInEx = new("bepinex", RegexOptions.IgnoreCase);
+                static public Regex BepInExPack = new("bepinexpack", RegexOptions.IgnoreCase);
+                static public Regex plugins = new("plugins", RegexOptions.IgnoreCase);
             }
 
-            static public void DeployMod(ModEntrySelection package)
+            static public string InferEntryParentDirectory(ZipArchiveEntry entry)
             {
-                string selectedVersionPath = package.ModEntry.Path + "\\" + package.SelectedVersion;
+                string topDir;
 
-                if (package.ModEntry.Name == "BepInExPack")
+                if (entry.FullName.Contains("/"))
                 {
-                    Utils.CopyDirectory(selectedVersionPath + "\\BepInExPack", GameDir, true);
+                    topDir = entry.FullName.Split("/")[0];
+                }
+                else if(entry.Name == "doorstop_config.ini" || entry.Name == "winhttp.dll")
+                {
+                    return GameDir;
                 }
                 else
                 {
-                    string destinationPath = InferModParentDirectory(package);
+                    return GameDir + "BepInEx\\plugins";
+                }
 
-                    Utils.CopyDirectory(selectedVersionPath, destinationPath, true);
+                if (RegularExpressions.BepInEx.IsMatch(topDir)) topDir = "BepInEx";
+                if (RegularExpressions.BepInExPack.IsMatch(topDir)) topDir = "BepInExPack";
+                if (RegularExpressions.plugins.IsMatch(topDir)) topDir = "plugins";
+
+                return topDir switch
+                {
+                    "BepInEx" => GameDir,
+                    "BepInExPack" => GameDir,
+                    "plugins" => GameDir + "BepInEx",
+                    "config" => GameDir + "BepInEx",
+                    "patchers" => GameDir + "BepInEx",
+                    _ => GameDir + "BepInEx\\plugins",
+                };
+            }
+
+            static public void DeployMod(IModEntry mod)
+            {
+                string selectedVersionPath = mod.Versions[mod.SelectedVersions[0]].AbsolutePath;
+                string[] excludedFilenames = ["icon.png", "manifest.json", "README.md", "CHANGELOG.md"];
+                string bepinexpack = "BepInExPack/";
+                string destinationPath;
+
+                using (ZipArchive zip = ZipFile.OpenRead(selectedVersionPath))
+                {
+                    foreach (ZipArchiveEntry entry in zip.Entries)
+                    {
+                        bool excluded = false;
+                        foreach (string name in excludedFilenames)
+                        {
+                            if (entry.Name.Contains(name))
+                            {
+                                excluded = true;
+                                break;
+                            }
+                        }
+
+                        if (excluded) continue;
+
+                        string extractPath = InferEntryParentDirectory(entry);
+
+                        if (entry.FullName.Contains(bepinexpack) && entry.FullName.Count() >= bepinexpack.Count())
+                        {
+                            destinationPath = Path.Combine(extractPath, entry.FullName.Substring(bepinexpack.Count()));
+                        }
+                        else
+                        {
+                            destinationPath = Path.Combine(extractPath, entry.FullName);
+                        }
+
+                        if (entry.Name == "")
+                        {
+                            Directory.CreateDirectory(destinationPath);
+                        }
+                        else
+                        {
+                            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
+                            entry.ExtractToFile(destinationPath, overwrite: true);
+                        }
+                    }
                 }
             }
 
             async static public Task DeployProfile(ModProfile profile)
             {
-                string profileInstanceDir = AppConfig.ProfileStorePath + "\\" + profile.Name;
+                if(profile.ModList.Find(m => m.Name == "BepInExPack") is IModEntry modEntry)
+                {
+                    DeployMod(modEntry);
+                }
+                else return;
 
-                if (Directory.Exists(profileInstanceDir))
-                {
-                    if (Directory.Exists(profileInstanceDir + "\\BepInEx")) Directory.Move(profileInstanceDir + "\\BepInEx", GameDir + "\\BepInEx");
-                    if (File.Exists(profileInstanceDir + "\\winhttp.dll")) File.Move(profileInstanceDir + "\\winhttp.dll", GameDir + "\\winhttp.dll");
-                    if (File.Exists(profileInstanceDir + "\\doorstop_config.ini")) File.Move(profileInstanceDir + "\\doorstop_config.ini", GameDir + "\\doorstop_config.ini");
-                }
-                else
-                {
-                    if (Directory.Exists(profileInstanceDir)) Directory.Delete(profileInstanceDir);
-                    foreach (ModEntrySelection package in profile.PackageList) DeployMod(package);
-                }
+                foreach (IModEntry mod in profile.ModList.FindAll(m => m.Name != "BepInExPack")) DeployMod(mod);
 
                 while (!File.Exists(GameDir + "\\" + "doorstop_config.ini")) await Task.Delay(100);
-
-                string bepinexDir = GameDir + "\\BepInEx";
-                string[] filenames = ["icon.png", "manifest.json", "README.md", "CHANGELOG.md"];
-                foreach (string filename in filenames)
-                {
-                    foreach (string path in Directory.GetFiles(bepinexDir, filename, SearchOption.AllDirectories)) File.Delete(path);
-                }
             }
 
-            static public void ExfiltrateProfile(ModProfile profile)
+            static public void CleanupGameDir()
             {
-                string profileInstanceDir = AppConfig.ProfileStorePath + "\\" + profile.Name;
-
-                if (!Directory.Exists(profileInstanceDir)) Directory.CreateDirectory(profileInstanceDir);
-
-                if (Directory.Exists(GameDir + "\\BepInEx")) Directory.Move(GameDir + "\\BepInEx", profileInstanceDir + "\\BepInEx");
-                if (File.Exists(GameDir + "\\doorstop_config.ini")) File.Move(GameDir + "\\doorstop_config.ini", profileInstanceDir + "\\doorstop_config.ini");
-                if (File.Exists(GameDir + "\\winhttp.dll")) File.Move(GameDir + "\\winhttp.dll", profileInstanceDir + "\\winhttp.dll");
+                if (Directory.Exists(GameDir + "BepInEx")) Directory.Delete(GameDir + "BepInEx", true);
+                if (File.Exists(GameDir + "winhttp.dll")) File.Delete(GameDir + "winhttp.dll");
+                if (File.Exists(GameDir + "doorstop_config.ini")) File.Delete(GameDir + "doorstop_config.ini");
             }
         }
 
         static internal class WebClient
         {
-            static public string PackageListCachePath = PackageManager.StorePath + "\\WebPackageListCache.json";
-            static private HttpClient HTTPClient = new();
-
-            static private class Endpoints
+            static public class Endpoints
             {
                 static public string BaseURL = "https://thunderstore.io/c/lethal-company/api/v1";
                 static public string PackageList = BaseURL + "/package";
             }
 
+            static public string PackageCachePath = AppConfig.PackageStore.LocalPath + "ThunderstoreCache.json";
+            static private HttpClient HTTPClient = new();
+
+
             //Cache singleton
-            public sealed class PackageCache
+            public class PackageCache
             {
                 static private Dictionary<string, PackageListing> _Cache = new();
 
-                static public TimeSpan RefreshInterval = new TimeSpan(AppConfig.WebCacheRefreshInterval.Item1,
-                                                                      AppConfig.WebCacheRefreshInterval.Item2,
-                                                                      AppConfig.WebCacheRefreshInterval.Item3);
+                static public TimeSpan RefreshInterval = new TimeSpan(AppConfig.WebCacheRefreshInterval["Hours"],
+                                                                      AppConfig.WebCacheRefreshInterval["Minutes"],
+                                                                      AppConfig.WebCacheRefreshInterval["Seconds"]);
 
-                static public DateTime LastRefresh = new FileInfo(PackageListCachePath).LastWriteTime;
+                static public DateTime LastRefresh = new FileInfo(PackageCachePath).LastWriteTime;
+
+                static public bool NeedsRefresh
+                {
+                    get
+                    {
+                        if (File.Exists(PackageCachePath)) return ((DateTime.Now - LastRefresh) > RefreshInterval);
+                        else return true;
+                    }
+                }
 
                 static public Dictionary<string, PackageListing> Instance
                 {
@@ -494,10 +499,8 @@ namespace LCModManager
 
                 PackageCache() { }
 
-                async static public Task Refresh(StatusBarControl statusBarControl)
+                async static public Task LoadCache()
                 {
-                    if ((DateTime.Now - LastRefresh) > RefreshInterval) await WebClient.RefreshPackageListCache(statusBarControl);
-
                     if (await GetPackageList() is List<PackageListing> list)
                     {
                         _Cache.Clear();
@@ -532,7 +535,7 @@ namespace LCModManager
                 }
             }
 
-            async static public Task<HttpResponseMessage?> DownloadPackageList()
+            async static public Task<HttpResponseMessage?> DownloadPackageListHeaders()
             {
                 try
                 {
@@ -545,46 +548,16 @@ namespace LCModManager
                 }
             }
 
-            async static public Task RefreshPackageListCache(StatusBarControl statusBarControl)
-            {
-                if (File.Exists(PackageListCachePath)) File.Delete(PackageListCachePath);
-
-                if (await DownloadPackageList() is HttpResponseMessage response)
-                {
-                    await statusBarControl.DownloadWithProgress(response, PackageListCachePath, AppState.RefreshingPackageList, false);
-                }
-            }
-
-            async static public Task RefreshPackageListCache()
-            {
-                if (File.Exists(PackageListCachePath)) File.Delete(PackageListCachePath);
-
-                if (await DownloadPackageList() is HttpResponseMessage response)
-                {
-                    string jsonString = Encoding.UTF8.GetString(await response.Content.ReadAsByteArrayAsync());
-
-                    try
-                    {
-                        File.WriteAllText(PackageListCachePath, jsonString, Encoding.UTF8);
-                    }
-                    catch (IOException ex)
-                    {
-                        Debug.Write(ex);
-                    }
-
-                }
-            }
-
             async static public Task<List<PackageListing>?> GetPackageList()
             {
                 try
                 {
-                    FileStream file = File.OpenRead(PackageListCachePath);
+                    PackageListing[] packages;
 
-                    PackageListing[] packages = JsonSerializer.Deserialize<PackageListing[]>(file);
-
-                    file.Close();
-                    file.Dispose();
+                    using (FileStream file = File.OpenRead(PackageCachePath))
+                    {
+                        packages = JsonSerializer.Deserialize<PackageListing[]>(file);
+                    }
 
                     return new List<PackageListing>(packages);
                 }
@@ -595,57 +568,17 @@ namespace LCModManager
                 }
             }
 
-            async static public Task<HttpResponseMessage?> DownloadPackage(PackageListingVersionEntry versionEntry, HttpCompletionOption completionOption = HttpCompletionOption.ResponseHeadersRead)
+            async static public Task<HttpResponseMessage?> DownloadPackageHeaders(PackageListingVersion versionEntry)
             {
                 try
                 {
-                    return await HTTPClient.GetAsync(versionEntry.download_url, completionOption);
+                    return await HTTPClient.GetAsync(versionEntry.download_url, HttpCompletionOption.ResponseHeadersRead);
                 }
                 catch (HttpRequestException ex)
                 {
                     Debug.Write(ex);
                     return null;
                 }
-            }
-
-            async static public Task<HttpResponseMessage?> DownloadDependency(ModEntry entry, string version)
-            {
-                if (entry.Author != null)
-                {
-                    return await DownloadDependency(entry.Author + "-" + entry.Name + "-" + version);
-                }
-                else return null;
-            }
-
-            async static public Task<HttpResponseMessage?> DownloadDependency(string dependencyString, HttpCompletionOption completionOption = HttpCompletionOption.ResponseHeadersRead)
-            {
-                string[] depParts = dependencyString.Split("-");
-
-                PackageListing? query = WebClient.GetCachedPackage(depParts[^3] + "-" + depParts[^2]);
-
-                if (query != null)
-                {
-                    PackageListingVersionEntry versionEntry = query.Value.versions.First(v => v.version_number == depParts[^1]);
-
-                    if (await DownloadPackage(versionEntry, completionOption) is HttpResponseMessage response)
-                    {
-                        return response;
-                    }
-                    else return null;
-                }
-                else return null;
-            }
-
-            async static public Task<HttpResponseMessage?[]> DownloadDependencies(string[] dependencies)
-            {
-                HttpResponseMessage?[] responses = new HttpResponseMessage[dependencies.Length];
-
-                foreach (string dep in dependencies)
-                {
-                    responses.Append(await DownloadDependency(dep));
-                }
-
-                return responses;
             }
         }
     }

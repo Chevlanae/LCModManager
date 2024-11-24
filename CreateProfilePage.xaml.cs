@@ -12,26 +12,24 @@ using System.Windows.Controls;
 
 namespace LCModManager
 {
-    /// <summary>
-    /// Interaction logic for CreateProfilePage.xaml
-    /// </summary>
     public partial class CreateProfilePage : Page
     {
-        public ObservableCollection<ModEntryDisplay> ModList = [];
-        private StatusBarControl _StatusBarControl;
+        public ObservableCollection<IModEntry> ModList = [];
+        public ObservableCollection<ModProfile> ProfileList = [];
 
-        public CreateProfilePage(StatusBarControl statusBarCtrl)
+        public CreateProfilePage()
         {
-            _StatusBarControl = statusBarCtrl;
-
             InitializeComponent();
 
             ModListControl.ItemsSource = ModList;
+            ProfileSelectorControl.ItemsSource= ProfileList;
 
             foreach (ModProfile profile in ProfileManager.GetProfiles())
             {
-                ProfileSelectorControl.Items.Add(profile);
+                ProfileList.Add(profile);
             }
+
+            RefreshModList();
         }
 
         async public Task RefreshModList()
@@ -39,45 +37,51 @@ namespace LCModManager
             if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
                 ModList.Clear();
+                List<IModEntry> existingMods = PackageManager.GetMods();
 
-                foreach (ModEntrySelection package in profile.PackageList)
+                foreach(IModEntry mod in profile.ModList)
                 {
-                    try
+                    if (mod.SelectedVersionsExist)
                     {
-                        ModPackage newPackage = new(package.ModEntry.Path);
-                        newPackage.Versions = [package.SelectedVersion];
-                        ModList.Add(newPackage);
+                        IModEntry existingMod = existingMods.Find(
+                            m =>
+                            m.Author == mod.Author &&
+                            m.Name == mod.Name &&
+                            m.Versions.ContainsKey(mod.SelectedVersions[0])
+                        );
+
+                        existingMod.SelectedVersions = [mod.SelectedVersions[0]];
+
+                        ModList.Add(existingMod);
                     }
-                    catch
+                    else
                     {
-                        List<PackageListing> query = WebClient.SearchPackageCache(p => p.Key.Split("-")[^1] == package.ModEntry.Name);
+                        List<PackageListing> query = WebClient.SearchPackageCache(p => p.Key.Split("-")[1] == mod.Name);
 
                         switch (query.Count)
                         {
                             case 1:
-
-                                ModList.Add(new ModPackage(query[0], package.SelectedVersion));
+                                mod.GetIcon(new Uri(query[0].versions[0].icon));
+                                ModList.Add(mod);
                                 break;
                             default:
 
-                                bool match = false;
                                 foreach (PackageListing item in query)
                                 {
-                                    if (item.owner == package.ModEntry.Author)
+                                    if (item.owner == mod.Author)
                                     {
-                                        ModList.Add(new ModPackage(item, package.SelectedVersion));
-                                        match = true;
+                                        mod.GetIcon(new Uri(item.versions[0].icon));
+                                        ModList.Add(mod);
                                         break;
                                     }
                                 }
 
-                                if (!match) ModList.Add(new ModPackage(package.ModEntry, true));
                                 break;
                         }
                     }
                 }
 
-                foreach (ModEntryDisplay mod in ModList)
+                foreach (IModEntry mod in ModList)
                 {
                     mod.ProcessDependencies(ModList.ToList());
                 }
@@ -96,7 +100,9 @@ namespace LCModManager
                 {
                     ProfileManager.AddProfile(newProfile);
 
-                    ProfileSelectorControl.SelectedIndex = ProfileSelectorControl.Items.Add(newProfile);
+                    ProfileList.Add(newProfile);
+
+                    ProfileSelectorControl.SelectedIndex = ProfileList.IndexOf(newProfile);
                 }
             }
 
@@ -134,7 +140,7 @@ namespace LCModManager
             {
                 ProfileManager.DeleteProfile(profile);
 
-                ProfileSelectorControl.Items.Remove(profile);
+                ProfileList.Remove(profile);
 
                 ModList.Clear();
             }
@@ -155,20 +161,18 @@ namespace LCModManager
 
                 if (dialog.ShowDialog() == true)
                 {
-                    foreach (ModPackage package in dialog.ModListControl.SelectedItems)
+                    foreach (IModEntry mod in dialog.ModListControl.SelectedItems)
                     {
-                        if (package.SelectedVersions.Count > 0)
+                        if (mod.SelectedVersions.Count > 0)
                         {
-                            package.Versions = [package.SelectedVersions[0]];
+                            mod.SelectedVersions = [mod.SelectedVersions[0]];
                         }
                         else
                         {
-                            package.Versions = [package.Versions[0]];
+                            mod.SelectedVersions = [mod.Versions.Keys.First()];
                         }
 
-                        ModEntrySelection state = new(package.Versions[0], package.ToModEntry());
-
-                        if (!profile.PackageList.Contains(state)) profile.PackageList.Add(state);
+                        if (!profile.ModList.Contains(mod)) profile.ModList.Add(mod);
                     }
 
                     ProfileManager.SaveProfile(profile);
@@ -184,9 +188,15 @@ namespace LCModManager
         {
             if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
-                foreach (ModEntry entry in ModListControl.SelectedItems)
+                foreach (IModEntry mod in ModListControl.SelectedItems)
                 {
-                    profile.PackageList.RemoveAll(e => e.ModEntry.Name == entry.Name);
+                    profile.ModList.RemoveAt(
+                        profile.ModList.FindIndex(
+                            m =>
+                            m.Author == mod.Author &&
+                            m.Name == mod.Name
+                        )
+                    );
                 }
 
                 ProfileManager.SaveProfile(profile);
@@ -205,13 +215,18 @@ namespace LCModManager
                 {
                     List<string> missingDependencies = new();
 
-                    foreach (ModEntryDisplay item in ModList)
+                    foreach (IModEntry item in ModList)
                     {
                         foreach (string dep in item.MissingDependencies)
                         {
-                            if (await _StatusBarControl.DownloadWithProgress(dep) is string downloadPath && await PackageManager.AddPackage(downloadPath) is ModPackage newPackage)
+                            if (await base.DownloadModPackage(dep) is string downloadPath && await PackageManager.AddMod(downloadPath) is IModEntry newMod)
                             {
-                                profile.PackageList.Add(new ModEntrySelection(dep.Split('-')[2], newPackage.ToModEntry()));
+                                string version = dep.Split("-")[2];
+
+                                newMod.Versions[version] = new Uri(downloadPath);
+                                newMod.SelectedVersions = [dep.Split("-")[2]];
+
+                                if(profile.ModList.Find(m => m.Name == newMod.Name && m.Author == newMod.Author) == null) profile.ModList.Add(newMod);
                             }
                         }
                     }
@@ -221,15 +236,15 @@ namespace LCModManager
 
                 ProfileManager.SaveProfile(profile);
 
-                foreach (ModEntryDisplay item in ModList)
+                foreach (IModEntry item in ModList)
                 {
                     if (!item.ExistsInPackageStore)
                     {
-                        string fullName = item.Author + "-" + item.Name + "-" + item.Versions[0];
+                        string fullName = item.Author + "-" + item.Name + "-" + item.SelectedVersions[0];
 
-                        if (await _StatusBarControl.DownloadWithProgress(fullName) is string download)
+                        if (await base.DownloadModPackage(fullName) is string download)
                         {
-                            PackageManager.AddPackage(download);
+                            await PackageManager.AddMod(download);
                         }
                     }
                 }
@@ -270,7 +285,7 @@ namespace LCModManager
         async private void ImportStringButton_Click(object sender, RoutedEventArgs e)
         {
             EnterTextDialog dialog = new("Import profile string", "Paste profile string here");
-            Regex base64Regex = new("^[-A-Za-z0-9+/]*={0,3}$");
+            Regex base64Regex = new("^[-A-Za-z0-9+/]*={0,3}$", RegexOptions.Compiled);
 
             if (dialog.ShowDialog() == true && base64Regex.IsMatch(dialog.InputTextBox.Text))
             {

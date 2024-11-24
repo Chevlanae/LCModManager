@@ -25,7 +25,7 @@ namespace LCModManager
     public partial class WebClientWindow : Window
     {
         public Dictionary<string, PackageListing> QueriedPackages = new();
-        public ObservableCollection<ModEntryDisplay> ModList = [];
+        public ObservableCollection<IModEntry> ModList = [];
 
         public WebClientWindow()
         {
@@ -44,9 +44,9 @@ namespace LCModManager
 
             foreach (PackageListing listing in WebClient.SearchPackageCache(k => reg.IsMatch(k.Value.name)))
             {
-                ModPackage newPackage = new ModPackage(listing);
-                newPackage.Website = listing.package_url;
-                ModList.Add(newPackage);
+                Mod mod = new Mod();
+                mod.FromPackageListing(listing);
+                ModList.Add(mod);
             }
 
             ItemCountTextBlock.Text = "Returned " + ModList.Count.ToString() + " Results";
@@ -66,12 +66,12 @@ namespace LCModManager
 
         private void VersionListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (sender is ListView list && list.DataContext is ModEntryDisplay entry)
+            if (sender is ListView list && list.DataContext is IModEntry mod)
             {
-                entry.SelectedVersions.Clear();
+                mod.SelectedVersions.Clear();
                 foreach (string version in list.SelectedItems)
                 {
-                    entry.SelectedVersions.Add(version);
+                    mod.SelectedVersions.Add(version);
                 }
             }
 

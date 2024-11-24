@@ -1,4 +1,4 @@
-﻿<Page x:Class="LCModManager.ManageModsPage"
+﻿<local:Page x:Class="LCModManager.ManageModsPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -155,7 +155,7 @@
                             <Setter Property="Margin" Value="20,0,0,0" />
                         </Trigger>
                     </Style.Triggers>
-                    <Setter Property="ItemsSource" Value="{Binding Path=Versions}" />
+                    <Setter Property="ItemsSource" Value="{Binding Path=Versions.Keys}" />
                     <Setter Property="HorizontalAlignment" Value="Center" />
                     <Setter Property="VerticalAlignment" Value="Center" />
                     <Setter Property="MaxHeight" Value="100" />
@@ -212,4 +212,4 @@
             </DataGrid.Columns>
         </DataGrid>
     </Grid>
-</Page>
+</local:Page>

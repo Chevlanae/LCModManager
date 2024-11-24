@@ -1,4 +1,4 @@
-﻿<Page x:Class="LCModManager.CreateProfilePage"
+﻿<local:Page x:Class="LCModManager.CreateProfilePage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -222,7 +222,7 @@
                         <TextBlock Text="Name" />
                     </DataGridTextColumn.Header>
                 </DataGridTextColumn>
-                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=Versions[0]}" MinWidth="70">
+                <DataGridTextColumn ElementStyle="{StaticResource TextBlockStyle}" Binding="{Binding Path=SelectedVersions[0]}" MinWidth="70">
                     <DataGridTextColumn.Header>
                         <TextBlock Text="Version" />
                     </DataGridTextColumn.Header>
@@ -260,4 +260,4 @@
             </DataGrid.Columns>
         </DataGrid>
     </Grid>
-</Page>
+</local:Page>

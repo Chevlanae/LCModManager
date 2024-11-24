@@ -1,78 +1,64 @@
 ﻿using LCModManager.Thunderstore;
-using System.Globalization;
+using System;
+using System.Collections;
 using System.IO;
-using System.Runtime.Intrinsics.Arm;
 using System.Runtime.Serialization;
-using System.Windows.Data;
-using System.Xml.Serialization;
 
 namespace LCModManager
 {
     [DataContract]
+    [KnownType(typeof(ModPackage))]
+    [KnownType(typeof(Mod))]
     public class ModProfile
     {
         [DataMember]
-        public List<ModEntrySelection> PackageList = [];
+        public List<IModEntry> ModList { get; set; }
 
         [DataMember]
         public string Name { get; set; }
 
-        public ModEntrySelection this[int index]
-        {
-            get
-            {
-                return PackageList[index];
-            }
-            set
-            {
-                PackageList[index] = value;
-            }
-        }
-
         public ModProfile()
         {
+            ModList = [];
             Name = "";
         }
 
         public ModProfile(string name)
         {
+            ModList = [];
             Name = name;
         }
 
-        public ModProfile(string name, IEnumerable<ModEntryDisplay> modList)
+        public ModProfile(string name, string storeName, List<IModEntry> modList)
         {
+            ModList = [];
             Name = name;
 
-            int i = 0;
-            foreach (ModEntryDisplay mod in modList)
+            foreach(IModEntry mod in modList)
             {
-                this[i] = mod.ToModEntrySelection(mod.SelectedVersions[0]);
-                i++;
+                ModList.Add(mod);
             }
         }
     }
 
     static internal class ProfileManager
     {
+        static private string StorePath = AppConfig.ProfileStore.AbsolutePath;
+
         static public ModProfile? GetProfile(string path)
         {
             if (path[^4..^0].ToString() == ".xml")
             {
                 try
                 {
-                    XmlSerializer x = new(typeof(ModProfile));
-
-                    using Stream fileReader = File.OpenRead(path);
+                    DataContractSerializer serializer = new(typeof(ModProfile));
 
                     ModProfile? result = null;
 
-                    if (x.Deserialize(fileReader) is ModProfile profile)
+                    using (Stream file = File.OpenRead(path))
                     {
-                        result = profile;
+                        result = (ModProfile)serializer.ReadObject(file);
                     }
-
-                    fileReader.Close();
-                    fileReader.Dispose();
 
                     return result;
                 }
@@ -88,7 +74,7 @@ namespace LCModManager
         {
             List<ModProfile> list = [];
 
-            foreach (string file in Directory.GetFiles(AppConfig.ProfileStorePath))
+            foreach (string file in Directory.GetFiles(StorePath))
             {
                 if (GetProfile(file) is ModProfile profile) list.Add(profile);
             }
@@ -98,47 +84,39 @@ namespace LCModManager
 
         static public void AddProfile(ModProfile newProfile)
         {
-            string path = AppConfig.ProfileStorePath + "\\" + newProfile.Name + ".xml";
+            string filePath = StorePath + "\\" + newProfile.Name + ".xml";
 
-            if (!File.Exists(path))
+            if (!File.Exists(filePath))
             {
-                using Stream newFile = File.Create(AppConfig.ProfileStorePath + "\\" + newProfile.Name + ".xml");
+                DataContractSerializer serializer = new(newProfile.GetType());
 
-                XmlSerializer x = new(newProfile.GetType());
-
-                x.Serialize(newFile, newProfile);
-
-                newFile.Close();
-                newFile.Dispose();
+                using (Stream newFile = File.Create(filePath))
+                {
+                    serializer.WriteObject(newFile, newProfile);
+                }
             }
         }
 
         static public void SaveProfile(ModProfile profile)
         {
-            string dirPath = AppConfig.ProfileStorePath + "\\" + profile.Name;
-            string filePath = dirPath + ".xml";
+            string filePath = StorePath + "\\" + profile.Name + ".xml";
 
             if (File.Exists(filePath))
             {
-                using Stream file = File.Create(filePath);
-                XmlSerializer x = new(profile.GetType());
+                DataContractSerializer serializer = new(profile.GetType());
 
-                x.Serialize(file, profile);
-
-                file.Close();
-                file.Dispose();
+                using (Stream newFile = File.Create(filePath))
+                {
+                    serializer.WriteObject(newFile, profile);
+                }
             }
-
-            if (Directory.Exists(dirPath)) Directory.Delete(dirPath, true);
         }
 
         static public void DeleteProfile(ModProfile profile)
         {
-            string filePath = AppConfig.ProfileStorePath + "\\" + profile.Name + ".xml";
-            string directoryPath = AppConfig.ProfileStorePath + "\\" + profile.Name;
+            string filePath = StorePath + "\\" + profile.Name + ".xml";
 
             if (File.Exists(filePath)) File.Delete(filePath);
-            if (Directory.Exists(directoryPath)) Directory.Delete(directoryPath, true);
         }
     }
 }

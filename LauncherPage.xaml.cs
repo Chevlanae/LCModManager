@@ -11,12 +11,8 @@ namespace LCModManager
     /// </summary>
     public partial class LauncherPage : Page
     {
-        private StatusBarControl _StatusBarControl;
-
-        public LauncherPage(StatusBarControl statusBarCtrl)
+        public LauncherPage()
         {
-            _StatusBarControl = statusBarCtrl;
-
             InitializeComponent();
 
             RefreshProfiles();
@@ -48,7 +44,7 @@ namespace LCModManager
 
                     process?.WaitForExit();
 
-                    ModDeployer.ExfiltrateProfile(profile);
+                    ModDeployer.CleanupGameDir();
                 }
             }
         }

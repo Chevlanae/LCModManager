@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Media.Imaging;
@@ -9,55 +11,71 @@ namespace LCModManager
 {
     public interface IModEntry
     {
-        public bool ExistsInPackageStore { get; set; }
-        public string Path { get; set; }
+        public BitmapImage? Icon { get; set; }
+        public string SourceName { get; set; }
         public string Name { get; set; }
         public string? Author { get; set; }
         public string? Description { get; set; }
         public string? Website { get; set; }
-        public string? IconUri { get; set; }
-        public List<string> Versions { get; set; }
+        public Dictionary<string, Uri> Versions { get; set; }
+        public List<string> SelectedVersions { get; set; }
         public string[]? Dependencies { get; set; }
         public string[]? MissingDependencies { get; set; }
         public string[]? MismatchedDependencies { get; set; }
+        public bool SelectedVersionsExist { get; }
+        public bool ExistsInPackageStore { get; }
+        public bool HasMissingDependencies { get; }
+        public bool HasMismatchedDependencies { get; }
+        public bool HasIncompatibility { get; }
+
+        public void FromLocalPath(string localPath);
+        public void GetIcon(Uri uri);
+        public void GetIcon(Stream stream);
+        public void ProcessDependencies(List<IModEntry> modlist);
     }
 
-    public class ModEntry : IModEntry
-    {
-        public bool ExistsInPackageStore { get; set; } = false;
-        public string Path { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string? Author { get; set; }
-        public string? Description { get; set; }
-        public string? Website { get; set; }
-        public string? IconUri { get; set; }
-        public List<string> Versions { get; set; } = [];
-        public string[]? Dependencies { get; set; }
-        public string[]? MissingDependencies { get; set; }
-        public string[]? MismatchedDependencies { get; set; }
-    }
-
-    public class ModEntrySelection
-    {
-        public string SelectedVersion;
-        public ModEntry ModEntry;
-
-        public ModEntrySelection()
-        {
-            SelectedVersion = "";
-            ModEntry = new ModEntry();
-        }
-
-        public ModEntrySelection(string selectedVersion, ModEntry modEntry)
-        {
-            SelectedVersion = selectedVersion;
-            ModEntry = modEntry;
-        }
-    }
-
-    public class ModEntryDisplay : ModEntry
+    [DataContract]
+    public abstract class ModPackage : IModEntry
     {
         public BitmapImage? Icon { get; set; }
+
+        [DataMember]
+        public string SourceName { get; set; }
+        [DataMember]
+        public string Name { get; set; } = "";
+        [DataMember]
+        public string? Author { get; set; }
+        [DataMember]
+        public string? Description { get; set; }
+        [DataMember]
+        public string? Website { get; set; }
+        [DataMember]
+        public Dictionary<string, Uri> Versions { get; set; } = new();
+        [DataMember]
+        public List<string> SelectedVersions { get; set; } = [];
+        [DataMember]
+        public string[]? Dependencies { get; set; }
+        [DataMember]
+        public string[]? MissingDependencies { get; set; }
+        [DataMember]
+        public string[]? MismatchedDependencies { get; set; }
+
+        public bool SelectedVersionsExist
+        {
+            get
+            {
+                return SelectedVersions.All(v => AppConfig.PackageStore.IsBaseOf(Versions[v]) && File.Exists(Versions[v].LocalPath));
+            }
+        }
+
+        public bool ExistsInPackageStore
+        {
+            get
+            {
+                return Versions.Any(v => AppConfig.PackageStore.IsBaseOf(v.Value) && File.Exists(v.Value.AbsolutePath));
+            }
+        }
+
         public bool HasMissingDependencies
         {
             get
@@ -82,9 +100,45 @@ namespace LCModManager
             }
         }
 
-        public List<string> SelectedVersions = [];
+        public abstract void FromUri(Uri uri);
+        public abstract void FromModEntry(IModEntry modEntry);
+        public void FromLocalPath(string localPath)
+        {
+            FromUri(new Uri(localPath));
+        }
 
-        public void ProcessDependencies(List<ModEntryDisplay> modlist)
+        public void GetIcon(Uri uri)
+        {
+            if (uri.IsFile)
+            {
+                Icon = new BitmapImage();
+                Icon.BeginInit();
+                Icon.UriSource = uri;
+                Icon.DecodePixelWidth = 64;
+                Icon.DecodePixelHeight = 64;
+                Icon.CacheOption = BitmapCacheOption.OnLoad;
+                Icon.Freeze();
+                Icon.EndInit();
+            }
+
+        }
+
+        public void GetIcon(Stream stream)
+        {
+            using (stream)
+            {
+                Icon = new BitmapImage();
+                Icon.BeginInit();
+                Icon.StreamSource = stream;
+                Icon.DecodePixelWidth = 64;
+                Icon.DecodePixelHeight = 64;
+                Icon.CacheOption = BitmapCacheOption.OnLoad;
+                Icon.Freeze();
+                Icon.EndInit();
+            }
+        }
+
+        public void ProcessDependencies(List<IModEntry> modlist)
         {
             if (Dependencies != null)
             {
@@ -98,7 +152,7 @@ namespace LCModManager
                     string name = depStrParts[^2];
                     string version = depStrParts[^1];
 
-                    List<ModEntryDisplay> foundDependencies = modlist.FindAll(e => e.Name == name && e.Author == owner);
+                    List<IModEntry> foundDependencies = modlist.FindAll(e => e.Name == name && e.Author == owner);
 
                     switch (foundDependencies.Count)
                     {
@@ -113,7 +167,7 @@ namespace LCModManager
                             {
                                 missingDeps.Add(depStr);
                             }
-                            else if (!foundDependencies[0].Versions.Contains(version))
+                            else if (!foundDependencies[0].Versions.ContainsKey(version))
                             {
                                 mismatchedDeps.Add(depStr);
                             }
@@ -121,9 +175,9 @@ namespace LCModManager
 
                         default:
                             bool match = false;
-                            foreach (ModEntryDisplay item in foundDependencies)
+                            foreach (IModEntry item in foundDependencies)
                             {
-                                if (item.Versions.Contains(version))
+                                if (item.Versions.ContainsKey(version))
                                 {
                                     match = true;
                                     break;
@@ -138,33 +192,6 @@ namespace LCModManager
                 MismatchedDependencies = [.. mismatchedDeps];
                 MissingDependencies = [.. missingDeps];
             }
-        }
-
-        public ModEntry ToModEntry()
-        {
-            return new ModEntry
-            {
-                Path = Path,
-                Name = Name,
-                Author = Author,
-                Description = Description,
-                Versions = Versions,
-                Website = Website,
-                IconUri = IconUri,
-                Dependencies = Dependencies,
-                MissingDependencies = MissingDependencies,
-                MismatchedDependencies = MismatchedDependencies,
-                ExistsInPackageStore = ExistsInPackageStore
-            };
-        }
-
-        public ModEntrySelection ToModEntrySelection(string selectedVersion)
-        {
-            return new ModEntrySelection
-            {
-                SelectedVersion = selectedVersion,
-                ModEntry = ToModEntry()
-            };
         }
     }
 }

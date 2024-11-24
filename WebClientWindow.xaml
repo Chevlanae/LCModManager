@@ -80,7 +80,7 @@
                 <DataGridTemplateColumn Header="Versions" MinWidth="100">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <ListView ItemsSource="{Binding Path=Versions}" 
+                            <ListView ItemsSource="{Binding Path=Versions.Keys}" 
                                 HorizontalAlignment="Center" 
                                 VerticalAlignment="Center" 
                                 Background="Transparent"

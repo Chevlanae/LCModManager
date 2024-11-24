@@ -9,7 +9,7 @@
         Title="Error occurred" 
         Width="450"
         Height="300">
-    <Grid Margin="10">
+    <Grid Margin="10, 10, 10, 0">
         <Grid.RowDefinitions>
             <RowDefinition />
             <RowDefinition Height="30" />
@@ -34,6 +34,7 @@
         </Grid>
 
         <Label Grid.Row="1" Content="Exception details:" />
+        
         <TextBox Grid.Row="2"
              Name="ErrorMessageTextBox"
              TextWrapping="Wrap"
