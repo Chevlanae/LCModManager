@@ -1,10 +1,8 @@
 ﻿using LCModManager.Thunderstore;
 using Microsoft.Win32;
-using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Runtime.Serialization;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -165,11 +163,11 @@ namespace LCModManager
                     {
                         if (mod.SelectedVersions.Count > 0)
                         {
-                            mod.SelectedVersions = [mod.SelectedVersions[0]];
+                            mod.SelectedVersions = [mod.SelectedVersions[^1]];
                         }
                         else
                         {
-                            mod.SelectedVersions = [mod.Versions.Keys.First()];
+                            mod.SelectedVersions = [mod.Versions.Keys.Last()];
                         }
 
                         if (!profile.ModList.Contains(mod)) profile.ModList.Add(mod);
@@ -221,12 +219,19 @@ namespace LCModManager
                         {
                             if (await base.DownloadModPackage(dep) is string downloadPath && await PackageManager.AddMod(downloadPath) is IModEntry newMod)
                             {
-                                string version = dep.Split("-")[2];
+                                string newVersion = dep.Split("-")[2];
 
-                                newMod.Versions[version] = new Uri(downloadPath);
-                                newMod.SelectedVersions = [dep.Split("-")[2]];
+                                newMod.Versions[newVersion] = new Uri(downloadPath);
+                                newMod.SelectedVersions = [newVersion];
 
-                                if(profile.ModList.Find(m => m.Name == newMod.Name && m.Author == newMod.Author) == null) profile.ModList.Add(newMod);
+                                if(profile.ModList.Find(m => m.Name == newMod.Name && m.Author == newMod.Author) is IModEntry entry)
+                                {
+                                    int newVersionNumericalValue = int.Parse(String.Join("", newVersion.Split(".")));
+                                    int oldVersionNumericalValue = int.Parse(String.Join("", entry.SelectedVersions[0].Split(".")));
+
+                                    if (newVersionNumericalValue > oldVersionNumericalValue) entry.SelectedVersions[0] = newVersion;
+                                }
+                                else profile.ModList.Add(newMod);
                             }
                         }
                     }

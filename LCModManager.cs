@@ -1,16 +1,11 @@
 ﻿using LCModManager.Thunderstore;
-using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.IO.Packaging;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
-using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Media.Imaging;
 
 namespace LCModManager
 {

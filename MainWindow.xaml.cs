@@ -1,14 +1,5 @@
 ﻿using LCModManager.Thunderstore;
-using System;
-using System.ComponentModel;
-using System.IO;
-using System.Net.Http;
-using System.Runtime.CompilerServices;
-using System.Threading.Tasks;
-using System.Timers;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
 
 namespace LCModManager
 {

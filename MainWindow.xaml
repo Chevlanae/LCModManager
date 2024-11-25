@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:src="clr-namespace:LCModManager"
         mc:Ignorable="d"
-        Title="LCModManager Alpha v1.0" 
+        Title="LCModManager v1.2" 
         Height="Auto" 
         Width="Auto"
         d:DesignHeight="409.928" d:DesignWidth="569.813">

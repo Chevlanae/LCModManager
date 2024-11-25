@@ -55,16 +55,18 @@ namespace LCModManager
         public List<string> SelectedVersions { get; set; } = [];
         [DataMember]
         public string[]? Dependencies { get; set; }
-        [DataMember]
         public string[]? MissingDependencies { get; set; }
-        [DataMember]
         public string[]? MismatchedDependencies { get; set; }
 
         public bool SelectedVersionsExist
         {
             get
             {
-                return SelectedVersions.All(v => AppConfig.PackageStore.IsBaseOf(Versions[v]) && File.Exists(Versions[v].LocalPath));
+                if (SelectedVersions.All(v => Versions.Keys.Contains(v)))
+                {
+                    return SelectedVersions.All(v => AppConfig.PackageStore.IsBaseOf(Versions[v]) && File.Exists(Versions[v].LocalPath));
+                }
+                else return false;
             }
         }
 

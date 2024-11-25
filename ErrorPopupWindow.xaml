@@ -7,14 +7,13 @@
         mc:Ignorable="d"
         WindowStartupLocation="CenterOwner"
         Title="Error occurred" 
-        Width="450"
-        Height="300">
+        SizeToContent="Height"
+        Width="450">
     <Grid Margin="10, 10, 10, 0">
         <Grid.RowDefinitions>
-            <RowDefinition />
+            <RowDefinition Height="*"/>
+            <RowDefinition x:Name="ExceptionRow" />
             <RowDefinition Height="30" />
-            <RowDefinition />
-            <RowDefinition Height="40" />
         </Grid.RowDefinitions>
 
         <!-- Error Icon and Title -->
@@ -32,20 +31,24 @@
                    Margin="10,0,10,0" 
                    VerticalAlignment="Center"/>
         </Grid>
+        <Grid Grid.Row="1" x:Name="ExceptionGrid">
+            <Grid.RowDefinitions>
+                <RowDefinition />
+                <RowDefinition />
+            </Grid.RowDefinitions>
+            <Label x:Name="ExceptionLabel" Grid.Row="0" Content="Exception details:" />
 
-        <Label Grid.Row="1" Content="Exception details:" />
-        
-        <TextBox Grid.Row="2"
-             Name="ErrorMessageTextBox"
-             TextWrapping="Wrap"
-             IsReadOnly="True"
-             VerticalScrollBarVisibility="Auto"
-             Height="Auto"
-             BorderThickness="1"
-             BorderBrush="LightGray"/>
+            <TextBox Grid.Row="1"
+                 Name="ExceptionTextBox"
+                 TextWrapping="Wrap"
+                 IsReadOnly="True"
+                 VerticalScrollBarVisibility="Auto"
+                 BorderThickness="1"
+                 BorderBrush="LightGray"/>
+        </Grid>
 
         <!-- Buttons -->
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Close" Width="75" Height="20" Click="CloseButton_Click"/>
         </StackPanel>
     </Grid>

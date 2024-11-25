@@ -1,7 +1,5 @@
 ﻿using LCModManager.Thunderstore;
 using System.Diagnostics;
-using System.IO;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Navigation;
 

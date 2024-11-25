@@ -1,15 +1,12 @@
 ﻿using System.Collections;
-using System.Data;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Runtime.Serialization;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows.Media.Imaging;
-using Path = System.IO.Path;
 
 namespace LCModManager
 {
@@ -243,17 +240,16 @@ namespace LCModManager
                 foreach (string file in Directory.GetFiles(StorePath))
                 {
                     string[] nameparts = Path.GetFileNameWithoutExtension(file).Split("-");
+                    Mod newMod = GetModFromPath(file);
 
                     if (mods.Find(m => m.Author == nameparts[0] && m.Name == nameparts[1]) is Mod existingMod)
                     {
                         existingMod.Versions.Add(nameparts[2], new Uri(file));
+                        existingMod.Dependencies = existingMod.Dependencies.Union(newMod.Dependencies).ToArray();
                     }
                     else
                     {
-                        Mod newMod = GetModFromPath(file);
-
                         newMod.Versions.Add(nameparts[2], new Uri(file));
-
                         mods.Add(newMod);
                     }
                 }
@@ -264,27 +260,7 @@ namespace LCModManager
             static public List<IModEntry> GetMods(string name)
             {
                 Regex regex = new Regex(name);
-                List<IModEntry> mods = [];
-
-                foreach (string file in Directory.GetFiles(StorePath).Where(path => regex.IsMatch(path)))
-                {
-                    string[] nameparts = Path.GetFileNameWithoutExtension(file).Split("-");
-
-                    if (mods.Find(m => m.Author == nameparts[0] && m.Name == nameparts[1]) is Mod existingMod)
-                    {
-                        existingMod.Versions.Add(nameparts[2], new Uri(file));
-                    }
-                    else
-                    {
-                        Mod newMod = GetModFromPath(file);
-
-                        newMod.Versions.Add(nameparts[0], new Uri(file));
-
-                        mods.Add(newMod);
-                    }
-                }
-
-                return mods;
+                return GetMods(regex);
             }
 
             static public List<IModEntry> GetMods(Regex regex)
@@ -294,17 +270,16 @@ namespace LCModManager
                 foreach (string file in Directory.GetFiles(StorePath).Where(path => regex.IsMatch(path)))
                 {
                     string[] nameparts = Path.GetFileNameWithoutExtension(file).Split("-");
+                    Mod newMod = GetModFromPath(file);
 
                     if (mods.Find(m => m.Author == nameparts[0] && m.Name == nameparts[1]) is Mod existingMod)
                     {
                         existingMod.Versions.Add(nameparts[2], new Uri(file));
+                        existingMod.Dependencies = existingMod.Dependencies.Union(newMod.Dependencies).ToArray();
                     }
                     else
                     {
-                        Mod newMod = GetModFromPath(file);
-
-                        newMod.Versions.Add(nameparts[0], new Uri(file));
-
+                        newMod.Versions.Add(nameparts[2], new Uri(file));
                         mods.Add(newMod);
                     }
                 }
@@ -322,14 +297,14 @@ namespace LCModManager
                     {
                         foreach (KeyValuePair<string, Uri> v in mod.Versions)
                         {
-                            if (File.Exists(v.Value.AbsolutePath)) File.Delete(v.Value.AbsolutePath);
+                            if (File.Exists(v.Value.LocalPath)) File.Delete(v.Value.LocalPath);
                         }
                     }
                     else
                     {
                         foreach (string version in mod.SelectedVersions)
                         {
-                            string path = mod.Versions[version].AbsolutePath;
+                            string path = mod.Versions[version].LocalPath;
 
                             if (File.Exists(path)) File.Delete(path);
                         }
@@ -362,6 +337,10 @@ namespace LCModManager
                 {
                     topDir = entry.FullName.Split("/")[0];
                 }
+                else if (entry.FullName.Contains("\\"))
+                {
+                    topDir = entry.FullName.Split("\\")[0];
+                }
                 else if(entry.Name == "doorstop_config.ini" || entry.Name == "winhttp.dll")
                 {
                     return GameDir;
@@ -379,6 +358,7 @@ namespace LCModManager
                 {
                     "BepInEx" => GameDir,
                     "BepInExPack" => GameDir,
+                    "core" => GameDir + "BepInEx",
                     "plugins" => GameDir + "BepInEx",
                     "config" => GameDir + "BepInEx",
                     "patchers" => GameDir + "BepInEx",
@@ -446,11 +426,44 @@ namespace LCModManager
                 while (!File.Exists(GameDir + "\\" + "doorstop_config.ini")) await Task.Delay(100);
             }
 
-            static public void CleanupGameDir()
+            async static public Task CleanupGameDir()
             {
-                if (Directory.Exists(GameDir + "BepInEx")) Directory.Delete(GameDir + "BepInEx", true);
-                if (File.Exists(GameDir + "winhttp.dll")) File.Delete(GameDir + "winhttp.dll");
-                if (File.Exists(GameDir + "doorstop_config.ini")) File.Delete(GameDir + "doorstop_config.ini");
+                string bepinexDir = GameDir + "BepInEx";
+                string[] bepinexFiles = [
+                    GameDir + "winhttp.dll",
+                    GameDir + "doorstop_config.ini"
+                ];
+
+                while (Directory.Exists(bepinexDir))
+                {
+                    try
+                    {
+                        Directory.Delete(bepinexDir, true);
+                    }
+                    catch (UnauthorizedAccessException e)
+                    {
+                        continue;
+                    }
+
+                    Task.Delay(100);
+                }
+
+                foreach(string file in bepinexFiles)
+                {
+                    while (File.Exists(file))
+                    {
+                        try
+                        {
+                            File.Delete(file);
+                        }
+                        catch (UnauthorizedAccessException e)
+                        {
+                            continue;
+                        }
+
+                        Task.Delay(100);
+                    }
+                }
             }
         }
 

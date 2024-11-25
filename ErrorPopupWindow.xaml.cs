@@ -1,17 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
-using Windows.Foundation.Diagnostics;
 
 namespace LCModManager
 {
@@ -20,12 +8,21 @@ namespace LCModManager
     /// </summary>
     public partial class ErrorPopupWindow : Window
     {
-        public ErrorPopupWindow(string errorMessage, Exception ex, string title = "Error occured")
+        public ErrorPopupWindow(string errorMessage, Exception? ex = null, string title = "Error occured")
         {
             InitializeComponent();
             Title = title;
             HeaderMessageTextBox.Text = errorMessage;
-            ErrorMessageTextBox.Text = ex.ToString();
+
+            if (ex == null)
+            {
+                ExceptionGrid.Visibility = Visibility.Hidden;
+                ExceptionRow.Height = new GridLength(0);
+            }
+            else
+            {
+                ExceptionTextBox.Text = ex.ToString();
+            }
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)

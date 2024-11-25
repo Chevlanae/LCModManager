@@ -34,7 +34,7 @@ namespace LCModManager
             ModList = [];
             Name = name;
 
-            foreach(IModEntry mod in modList)
+            foreach (IModEntry mod in modList)
             {
                 ModList.Add(mod);
             }

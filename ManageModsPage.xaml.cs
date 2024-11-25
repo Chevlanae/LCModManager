@@ -1,6 +1,5 @@
 ﻿using LCModManager.Thunderstore;
 using Microsoft.Win32;
-using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
