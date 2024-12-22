@@ -1,12 +1,19 @@
 ﻿using LCModManager.Thunderstore;
 using Microsoft.Win32;
+using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Http;
+using System.Reflection.PortableExecutable;
 using System.Runtime.Serialization;
+using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace LCModManager
 {
@@ -35,54 +42,44 @@ namespace LCModManager
             if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
                 ModList.Clear();
-                List<IModEntry> existingMods = PackageManager.GetMods();
 
-                foreach(IModEntry mod in profile.ModList)
+                foreach (IModEntry profileMod in profile.ModList)
                 {
-                    if (mod.SelectedVersionsExist)
+                    if (profileMod.SelectedVersions.Count() > 0 && profileMod.SelectedVersionsExist)
                     {
+                        List<IModEntry> existingMods = await PackageManager.GetMods();
+
                         IModEntry existingMod = existingMods.Find(
                             m =>
-                            m.Author == mod.Author &&
-                            m.Name == mod.Name &&
-                            m.Versions.ContainsKey(mod.SelectedVersions[0])
+                            m.Author == profileMod.Author &&
+                            m.Name == profileMod.Name &&
+                            m.Versions.ContainsKey(profileMod.SelectedVersions[0])
                         );
 
-                        existingMod.SelectedVersions = [mod.SelectedVersions[0]];
-
+                        existingMod.SelectedVersions = [profileMod.SelectedVersions[0]];
                         ModList.Add(existingMod);
                     }
                     else
                     {
-                        List<PackageListing> query = WebClient.SearchPackageCache(p => p.Key.Split("-")[1] == mod.Name);
+                        List<Listing> query = WebClient.SearchCache(p => profileMod.Author + "-" + profileMod.Name == p.Key);
 
-                        switch (query.Count)
+                        if (query.Count() > 0)
                         {
-                            case 1:
-                                mod.GetIcon(new Uri(query[0].versions[0].icon));
-                                ModList.Add(mod);
-                                break;
-                            default:
-
-                                foreach (PackageListing item in query)
-                                {
-                                    if (item.owner == mod.Author)
-                                    {
-                                        mod.GetIcon(new Uri(item.versions[0].icon));
-                                        ModList.Add(mod);
-                                        break;
-                                    }
-                                }
-
-                                break;
+                            profileMod.GetIcon(new Uri(query[0].versions[0].icon));
+                            ModList.Add(profileMod);
                         }
                     }
                 }
 
-                foreach (IModEntry mod in ModList)
-                {
-                    mod.ProcessDependencies(ModList.ToList());
-                }
+                ModList.AsParallel().ForAll((m) => m.ProcessDependencies(ModList.ToList()));
+            }
+        }
+
+        private void Downloader_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (sender is Downloader downloader)
+            {
+                OnStatusUpdated(AppState.DownloadingMod, "Downloading " + downloader.Name + "...", true, (int)downloader.ProgressPercent);
             }
         }
 
@@ -148,7 +145,7 @@ namespace LCModManager
 
         async private void ProfileSelectorControl_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            RefreshModList();
+            await RefreshModList();
         }
 
         async private void AddModsButton_Click(object sender, RoutedEventArgs e)
@@ -209,58 +206,84 @@ namespace LCModManager
         {
             if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
-                while (ModList.Any(m => m.HasMissingDependencies))
-                {
-                    List<string> missingDependencies = new();
-
-                    foreach (IModEntry item in ModList)
-                    {
-                        foreach (string dep in item.MissingDependencies)
-                        {
-                            if (await base.DownloadModPackage(dep) is string downloadPath && await PackageManager.AddMod(downloadPath) is IModEntry newMod)
-                            {
-                                string newVersion = dep.Split("-")[2];
-
-                                newMod.Versions[newVersion] = new Uri(downloadPath);
-                                newMod.SelectedVersions = [newVersion];
-
-                                if(profile.ModList.Find(m => m.Name == newMod.Name && m.Author == newMod.Author) is IModEntry entry)
-                                {
-                                    int newVersionNumericalValue = int.Parse(String.Join("", newVersion.Split(".")));
-                                    int oldVersionNumericalValue = int.Parse(String.Join("", entry.SelectedVersions[0].Split(".")));
-
-                                    if (newVersionNumericalValue > oldVersionNumericalValue) entry.SelectedVersions[0] = newVersion;
-                                }
-                                else profile.ModList.Add(newMod);
-                            }
-                        }
-                    }
-
-                    await RefreshModList();
-                }
-
-                ProfileManager.SaveProfile(profile);
+                List<ListingVersion> needDownload = [];
 
                 foreach (IModEntry item in ModList)
                 {
-                    if (!item.ExistsInPackageStore)
+                    foreach (string dep in item.MissingDependencies)
                     {
-                        string fullName = item.Author + "-" + item.Name + "-" + item.SelectedVersions[0];
+                        string[] depParts = dep.Split("-");
+                        string fullName = System.String.Join("-", depParts[0..2]);
+                        string version = depParts[2];
 
-                        if (await base.DownloadModPackage(fullName) is string download)
+                        List<IModEntry> query = await PackageManager.GetMods(new Regex(dep));
+
+                        switch (query.Count)
                         {
-                            await PackageManager.AddMod(download);
+                            case 0:
+                                if
+                                (
+                                    WebClient.GetCachedListing(fullName) is Listing listing &&
+                                    listing.versions.FirstOrDefault(v => v.version_number == version) is ListingVersion listingVersion
+                                )
+                                {
+                                    needDownload.Add(listingVersion);
+                                }
+                                break;
+                            default:
+                                query[0].SelectedVersions.Add(version);
+
+                                if (profile.ModList.All(m => m.Author != query[0].Author && m.Name != query[0].Name))
+                                {
+                                    profile.ModList.Add(query[0]);
+                                }
+                                break;
                         }
                     }
                 }
 
+                ProfileManager.SaveProfile(profile);
                 await RefreshModList();
+
+                if(needDownload.Count > 0)
+                {
+                    ResolveDependenciesWindow resolveDependenciesWindow = new(needDownload);
+                    resolveDependenciesWindow.Closed += ResolveDependenciesWindow_Closed;
+                    resolveDependenciesWindow.Show();
+                }
             }
 
             e.Handled = true;
         }
 
-        async private void ShareProfileButton_Click(object sender, RoutedEventArgs e)
+        async private void ResolveDependenciesWindow_Closed(object? sender, EventArgs e)
+        {
+            if (sender is ResolveDependenciesWindow window && ProfileSelectorControl.SelectedItem is ModProfile profile)
+            {
+                foreach (ListingVersion downloadedVersion in window.DownloadedVersions)
+                {
+                    List<IModEntry> query = await PackageManager.GetMods(new Regex(downloadedVersion.full_name));
+
+                    switch (query.Count)
+                    {
+                        case 0:
+                            break;
+                        default:
+                            query[0].SelectedVersions.Add(downloadedVersion.version_number);
+                            if (profile.ModList.All(m => m.Author != query[0].Author && m.Name != query[0].Name))
+                            {
+                                profile.ModList.Add(query[0]);
+                            }
+                            break;
+                    }
+                }
+
+                ProfileManager.SaveProfile(profile);
+                await RefreshModList();
+            }
+        }
+
+        private void ShareProfileButton_Click(object sender, RoutedEventArgs e)
         {
             if (ProfileSelectorControl.SelectedItem is ModProfile profile)
             {
@@ -272,9 +295,22 @@ namespace LCModManager
                     {
                         serializer.WriteObject(stream, profile);
 
-                        string text = Convert.ToBase64String(stream.ToArray());
-
-                        Clipboard.SetText(text);
+                        switch (((MenuItem)sender).Name)
+                        {
+                            case "ExportXml":
+                                stream.Position = 0;
+                                using (StreamReader reader = new(stream, encoding: Encoding.UTF8))
+                                {
+                                    Clipboard.SetText(reader.ReadToEnd());
+                                }
+                                break;
+                            case "ExportBase64":
+                                Clipboard.SetText(Convert.ToBase64String(stream.ToArray()));
+                                break;
+                            case "ExportJSON":
+                                Clipboard.SetText(JsonSerializer.Serialize<ModProfile>(profile));
+                                break;
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -318,6 +354,34 @@ namespace LCModManager
             }
 
             e.Handled = true;
+        }
+
+        async private void DownloadMissingDependencies_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (IModEntry item in ModList)
+            {
+                string name = item.Author + "-" + item.Name;
+                string fullName = item.Author + "-" + item.Name + "-" + item.SelectedVersions[0];
+
+                if
+                (
+                    !item.ExistsInPackageStore &&
+                    WebClient.GetCachedListing(name) is Listing listing &&
+                    listing.versions.First(v => v.version_number == item.SelectedVersions[0]) is ListingVersion versionListing &&
+                    await WebClient.DownloadPackageHeaders(versionListing) is HttpResponseMessage headers
+                )
+                {
+                    Downloader downloader = new(fullName, headers);
+                    downloader.PropertyChanged += Downloader_PropertyChanged;
+
+                    if (await downloader.Download() is MemoryStream download)
+                    {
+                        await PackageManager.AddMod(download, fullName);
+                    }
+                }
+            }
+
+            await RefreshModList();
         }
     }
 }

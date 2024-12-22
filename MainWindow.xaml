@@ -13,66 +13,98 @@
         <src:AppStateConverter x:Key="AppStateConverter" />
     </Window.Resources>
     <Grid Background="FloralWhite">
-        <Grid x:Name="Layout" Margin="0,0,0,15">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="20" />
-                <ColumnDefinition Width="1*" />
-            </Grid.ColumnDefinitions>
-            <Menu x:Name="RibbonMenu"
-                  Height="20"
-                  Grid.ColumnSpan="2"
-                  Background="FloralWhite"
-                  HorizontalAlignment="Left"
-                  VerticalAlignment="Top"
-                  RenderTransformOrigin="0,0">
-                <Menu.RenderTransform>
-                    <TransformGroup>
-                        <ScaleTransform/>
-                        <SkewTransform/>
-                        <RotateTransform Angle="90"/>
-                        <TranslateTransform X="20"/>
-                    </TransformGroup>
-                </Menu.RenderTransform>
-                <MenuItem x:Name="ManageModsMenuItem" Header="Mods" ToolTip="Manage/Download Lethal Company mods" Click="NavTo_ManageMods">
-                    <MenuItem.Style>
-                        <Style TargetType="MenuItem">
+        <Grid.RowDefinitions>
+            <RowDefinition />
+            <RowDefinition Height="22" />
+        </Grid.RowDefinitions>
+        <DockPanel Grid.Row="0">
+            <DockPanel.Resources>
+                <Storyboard x:Key="RibbonMenuWidthTo15">
+                    <DoubleAnimation
+                        Storyboard.TargetName="RibbonMenu"
+                        Storyboard.TargetProperty="Width"
+                        From="80"
+                        To="15"
+                        Duration="0:0:0.5"/>
+                </Storyboard>
+                <Storyboard x:Key="RibbonMenuWidthTo80">
+                    <DoubleAnimation
+                        Storyboard.TargetName="RibbonMenu"
+                        Storyboard.TargetProperty="Width"
+                        From="15"
+                        To="80"
+                        Duration="0:0:0.5"/>
+                </Storyboard>
+            </DockPanel.Resources>
+            <StackPanel Orientation="Vertical">
+                <ToggleButton x:Name="RibbonMenuToggleButton" Content="≡" Background="Transparent" BorderThickness="0">
+                    <ToggleButton.Triggers>
+                        <EventTrigger RoutedEvent="ToggleButton.Checked">
+                            <BeginStoryboard Storyboard="{StaticResource RibbonMenuWidthTo80}" />
+                        </EventTrigger>
+                        <EventTrigger RoutedEvent="ToggleButton.Unchecked">
+                            <BeginStoryboard Storyboard="{StaticResource RibbonMenuWidthTo15}" />
+                        </EventTrigger>
+                    </ToggleButton.Triggers>
+                </ToggleButton>
+                <Menu x:Name="RibbonMenu"
+                      Width="15"
+                      Margin="5,5,5,0"
+                      Background="FloralWhite"
+                      HorizontalAlignment="Stretch">
+                    <Menu.Style>
+                        <Style TargetType="Menu">
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding ElementName=ViewFrame, Path=Content.Name}" Value="Mods">
-                                    <Setter Property="Background" Value="LightGray" />
+                                <DataTrigger Binding="{Binding IsChecked, ElementName=RibbonMenuToggleButton}" Value="False">
+                                    <Setter Property="Visibility" Value="Hidden" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsChecked, ElementName=RibbonMenuToggleButton}" Value="True">
+                                    <Setter Property="Visibility" Value="Visible" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </MenuItem.Style>
-                </MenuItem>
-                <MenuItem x:Name="CreateProfileMenuItem" Header="Profiles" ToolTip="Manage/Create shareable mod configurations" Click="NavTo_CreateProfile">
-                    <MenuItem.Style>
-                        <Style TargetType="MenuItem">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding ElementName=ViewFrame, Path=Content.Name}" Value="Profiles">
-                                    <Setter Property="Background" Value="LightGray" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </MenuItem.Style>
-                </MenuItem>
-                <MenuItem x:Name="LauncherMenuItem" Header="Launcher" ToolTip="Launch the game with a selected profile" Click="NavTo_Launcher">
-                    <MenuItem.Style>
-                        <Style TargetType="MenuItem">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding ElementName=ViewFrame, Path=Content.Name}" Value="Launcher">
-                                    <Setter Property="Background" Value="LightGray" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </MenuItem.Style>
-                </MenuItem>
-            </Menu>
-            <Frame x:Name="ViewFrame" Grid.Column="1" NavigationUIVisibility="Hidden"/>
-        </Grid>
-        <StatusBar x:Name="StatusBar" VerticalAlignment="Bottom" HorizontalContentAlignment="Right" Height="22" Margin="0,310,0,0" Grid.Row="1">
+                    </Menu.Style>
+                    <MenuItem x:Name="ManageModsMenuItem" Header="Mods" ToolTip="Manage/Download Lethal Company mods" Click="NavTo_ManageMods">
+                        <MenuItem.Style>
+                            <Style TargetType="MenuItem">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ElementName=ViewFrame, Path=Content.Name}" Value="Mods">
+                                        <Setter Property="Background" Value="LightGray" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                    <MenuItem x:Name="CreateProfileMenuItem" Header="Profiles" ToolTip="Manage/Create shareable mod configurations" Click="NavTo_CreateProfile">
+                        <MenuItem.Style>
+                            <Style TargetType="MenuItem">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ElementName=ViewFrame, Path=Content.Name}" Value="Profiles">
+                                        <Setter Property="Background" Value="LightGray" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                    <MenuItem x:Name="LauncherMenuItem" Header="Launcher" ToolTip="Launch the game with a selected profile" Click="NavTo_Launcher">
+                        <MenuItem.Style>
+                            <Style TargetType="MenuItem">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ElementName=ViewFrame, Path=Content.Name}" Value="Launcher">
+                                        <Setter Property="Background" Value="LightGray" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </MenuItem.Style>
+                    </MenuItem>
+                </Menu>
+            </StackPanel>
+            <Frame x:Name="ViewFrame" NavigationUIVisibility="Hidden"/>
+        </DockPanel>
+        <StatusBar x:Name="StatusBar" VerticalAlignment="Bottom" HorizontalContentAlignment="Right" Height="22" Grid.Row="1">
             <StatusBarItem HorizontalAlignment="Right">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock 
+                    <TextBlock
                         Margin="10,0,10,0" 
                         MinWidth="200" 
                         TextWrapping="NoWrap" 

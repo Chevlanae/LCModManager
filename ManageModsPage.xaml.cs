@@ -1,6 +1,7 @@
 ﻿using LCModManager.Thunderstore;
 using Microsoft.Win32;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -24,28 +25,16 @@ namespace LCModManager
 
             ModListControl.ItemsSource = ModList;
 
-            UpdateWebCache();
-
-            RefreshModList();
-        }
-
-        async public void UpdateWebCache()
-        {
-            if(WebClient.PackageCache.NeedsRefresh && await WebClient.DownloadPackageListHeaders() is HttpResponseMessage headers)
-            {
-                await base.DownloadFromResponseHeaders(headers, WebClient.PackageCachePath, AppState.RefreshingPackageList);
-            }
-
-            await WebClient.PackageCache.LoadCache();
+            Task.Run(RefreshModList);
         }
 
         async public Task RefreshModList()
         {
             ModList.Clear();
 
-            foreach (IModEntry mod in PackageManager.GetMods()) ModList.Add(mod);
+            foreach (IModEntry mod in await PackageManager.GetMods()) ModList.Add(mod);
 
-            foreach (IModEntry mod in ModList) mod.ProcessDependencies(ModList.ToList());
+            ModList.AsParallel().ForAll(m => m.ProcessDependencies(ModList.ToList()));
         }
 
         async private void AddPackage_Click(object sender, RoutedEventArgs e)
@@ -61,7 +50,7 @@ namespace LCModManager
             {
                 foreach (string filename in dialog.FileNames)
                 {
-                    base.OnStatusUpdated(new StatusArgs(AppState.AddingModPackage, "Adding mod package '" + filename.Split("\\")[^1] + "'..."));
+                    OnStatusUpdated(AppState.AddingModPackage, "Adding mod package '" + filename.Split("\\")[^1] + "'...");
                     await PackageManager.AddMod(filename);
                 }
 
@@ -71,15 +60,29 @@ namespace LCModManager
             e.Handled = true;
         }
 
+        private void Downloader_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (sender is Downloader downloader)
+            {
+                OnStatusUpdated(AppState.DownloadingMod, "Downloading " + downloader.Name + "...", true, (int)downloader.ProgressPercent);
+            }
+        }
+
         async private void RemovePackage_Click(object sender, RoutedEventArgs e)
         {
-            foreach (Mod mod in ModListControl.SelectedItems)
+            List<IModEntry> selection = new();
+
+            foreach(IModEntry mod in ModListControl.SelectedItems) selection.Add(mod);
+
+            foreach (IModEntry mod in selection)
             {
-                base.OnStatusUpdated(new StatusArgs(AppState.RemovingModPackage, "Removing " + mod.Name + " from package store..."));
+                OnStatusUpdated(AppState.RemovingModPackage, "Removing " + mod.Name + " from package store...");
                 await PackageManager.RemoveMod(mod);
+                ModList.Remove(mod);
             }
 
-            RefreshModList();
+            await RefreshModList();
+
             e.Handled = true;
         }
 
@@ -102,12 +105,22 @@ namespace LCModManager
                     {
                         if
                         (
-                            WebClient.GetCachedPackage(packageKey) is PackageListing listing &&
-                            await base.DownloadModPackage(listing.versions.First(v => v.version_number == version)) is string downloadPath
+                            ModList.All(m => m.Author + "-" + m.Name != packageKey && !m.Versions.ContainsKey(version)) &&
+                            WebClient.GetCachedListing(packageKey) is Listing listing &&
+                            listing.versions.First(v => v.version_number == version) is ListingVersion versionListing &&
+                            await WebClient.DownloadPackageHeaders(versionListing) is HttpResponseMessage headers
                         )
                         {
-                            base.OnStatusUpdated(new StatusArgs(AppState.AddingModPackage, "Adding mod package '" + downloadPath.Split("\\")[^1] + "'..."));
-                            await PackageManager.AddMod(downloadPath);
+                            Downloader downloader = new(versionListing.full_name, headers);
+                            downloader.PropertyChanged += Downloader_PropertyChanged;
+
+                            if (await downloader.Download() is MemoryStream download)
+                            {
+                                using (download)
+                                {
+                                    await PackageManager.AddMod(download, versionListing.full_name);
+                                }
+                            }
                         }
                         else
                         {
@@ -118,7 +131,7 @@ namespace LCModManager
                 }
             }
 
-            RefreshModList();
+            await RefreshModList();
             e.Handled = true;
         }
 
@@ -130,69 +143,41 @@ namespace LCModManager
 
         async private void ResolveDependencies_Click(object sender, RoutedEventArgs e)
         {
-            while (ModList.Any(m => m.HasIncompatibility))
+            List<string> missingDependencies = [];
+
+            foreach (IModEntry entry in ModList)
             {
-                foreach (IModEntry entry in ModList)
+                if (entry.HasIncompatibility)
                 {
-                    if (entry.HasIncompatibility)
-                    {
-                        List<string> missingDependencies = [];
+                    foreach (string dep in entry.MissingDependencies) if (!missingDependencies.Contains(dep)) missingDependencies.Add(dep);
 
-                        foreach (string dep in entry.MissingDependencies) missingDependencies.Add(dep);
-
-                        foreach (string dep in entry.MismatchedDependencies) if (!missingDependencies.Contains(dep)) missingDependencies.Add(dep);
-
-                        foreach (string dep in missingDependencies)
-                        {
-                            string[] depSplit = dep.Split("-");
-                            string fullname = String.Join("-", depSplit[..^1]);
-                            string version = depSplit[^1];
-
-                            try
-                            {
-                                if (WebClient.GetCachedPackage(fullname) is PackageListing packageListing)
-                                {
-                                    foreach (PackageListingVersion v in packageListing.versions)
-                                    {
-                                        if (v.version_number == version)
-                                        {
-                                            string destinationPath = await base.DownloadModPackage(v);
-
-                                            if (File.Exists(destinationPath))
-                                            {
-                                                base.OnStatusUpdated(new StatusArgs(AppState.AddingModPackage, "Unpacking \"" + fullname + "\""));
-                                                await PackageManager.AddMod(destinationPath);
-                                            }
-
-                                            break;
-                                        }
-                                    }
-                                }
-                                else
-                                {
-                                    ErrorPopupWindow errorPopup = new("Dependency '" + dep + "'" + " was not found in Thunderstore package list.", new Exception("Dependency " + fullname + " does not exist on Thunderstore.io"), "Error downloading dependency for '" + entry.Name + "'");
-                                    errorPopup.Show();
-
-                                    goto EndOfFunction;
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.Write(ex);
-
-                                ErrorPopupWindow errorPopup = new("An error occured while downloading '" + dep + "'", ex);
-                                errorPopup.Show();
-
-                                goto EndOfFunction;
-                            }
-                        }
-                    }
+                    foreach (string dep in entry.MismatchedDependencies) if (!missingDependencies.Contains(dep)) missingDependencies.Add(dep);
                 }
-
-                RefreshModList();
             }
 
-        EndOfFunction:
+            List<ListingVersion> dependencies = new();
+
+            foreach (string dep in missingDependencies)
+            {
+                string[] depSplit = dep.Split("-");
+                string author = depSplit[0];
+                string name = depSplit[1];
+                string fullname = String.Join("-", depSplit[..^1]);
+                string version = depSplit[2];
+
+                if (WebClient.GetCachedListing(fullname) is Listing packageListing)
+                {
+                    foreach (ListingVersion listingVersion in packageListing.versions)
+                    {
+                        if (listingVersion.version_number == version) dependencies.Add(listingVersion);
+                    }
+                }
+            }
+
+            ResolveDependenciesWindow resolveDepsWindow = new(dependencies);
+            resolveDepsWindow.Closed += async (sender, e) => await RefreshModList();
+            resolveDepsWindow.Show();
+
             e.Handled = true;
         }
 

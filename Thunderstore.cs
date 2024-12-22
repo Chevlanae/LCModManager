@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Net;
 using System.Net.Http;
 using System.Runtime.Serialization;
 using System.Text.Json;
@@ -12,7 +13,7 @@ namespace LCModManager
 {
     namespace Thunderstore
     {
-        internal struct ModManifest
+        public struct ModManifest
         {
             public string? Name { get; set; }
             public string? Author { get; set; }
@@ -32,7 +33,7 @@ namespace LCModManager
             }
         }
 
-        public struct PackageListing
+        public struct Listing
         {
             public string name { get; set; }
             public string full_name { get; set; }
@@ -47,10 +48,10 @@ namespace LCModManager
             public bool is_deprecated { get; set; }
             public bool has_nsfw_content { get; set; }
             public string[] categories { get; set; }
-            public PackageListingVersion[] versions { get; set; }
+            public ListingVersion[] versions { get; set; }
         }
 
-        public struct PackageListingVersion
+        public struct ListingVersion
         {
             public string name { get; set; }
             public string full_name { get; set; }
@@ -70,19 +71,19 @@ namespace LCModManager
         [DataContract]
         public class Mod : ModPackage
         {
-            private string? _ReadMe;
-            private string? _ChangeLog;
-            private ModManifest? _Manifest;
+            public string? ReadMe { get; set; }
+            public string? ChangeLog { get; set; }
+            public ModManifest? Manifest { get; set; }
 
-            public string? ReadMe => _ReadMe;
-            public string? ChangeLog => _ChangeLog;
-
-            public override void FromUri(Uri uri)
+            static public IModEntry FromUri(Uri uri)
             {
+                Mod newMod = new();
+
                 //uri is a file path, and is a local path that points to an existing file
                 if (uri.IsFile && uri.IsLoopback && File.Exists(uri.LocalPath))
                 {
-                    SourceName = Path.GetDirectoryName(uri.LocalPath).Split("\\")[^1];
+                    newMod.SourceName = Path.GetDirectoryName(uri.LocalPath).Split("\\")[^1];
+                    newMod.Author = Path.GetFileNameWithoutExtension(uri.LocalPath).Split("-")[0];
 
                     using (ZipArchive zip = ZipFile.OpenRead(uri.LocalPath))
                     {
@@ -93,95 +94,87 @@ namespace LCModManager
                                 case "README.md":
                                     using (StreamReader file = new(entry.Open()))
                                     {
-                                        _ReadMe = file.ReadToEnd();
+                                        newMod.ReadMe = file.ReadToEnd();
                                     }
                                     break;
 
                                 case "CHANGELOG.md":
                                     using (StreamReader file = new(entry.Open()))
                                     {
-                                        _ChangeLog = file.ReadToEnd();
+                                        newMod.ChangeLog = file.ReadToEnd();
                                     }
                                     break;
 
                                 case "icon.png":
                                     using (Stream file = entry.Open())
-                                    using (MemoryStream stream = new())
                                     {
-                                        file.CopyTo(stream);
-                                        stream.Position = 0;
-
-                                        Icon = new BitmapImage();
-                                        Icon.BeginInit();
-                                        Icon.StreamSource = stream;
-                                        Icon.DecodePixelWidth = 64;
-                                        Icon.DecodePixelHeight = 64;
-                                        Icon.CacheOption = BitmapCacheOption.OnLoad;
-                                        Icon.EndInit();
+                                        newMod.GetIcon(file);
                                     }
                                     break;
 
                                 case "manifest.json":
                                     using (StreamReader file = new(entry.Open()))
                                     {
-                                        _Manifest = new ModManifest(file.ReadToEnd(), new(JsonSerializerDefaults.Web));
+                                        newMod.Manifest = new ModManifest(file.ReadToEnd(), new(JsonSerializerDefaults.Web));
                                     }
 
-                                    Name = _Manifest?.Name ?? "";
-                                    Description = _Manifest?.Description;
-                                    Website = _Manifest?.Website_Url;
-                                    Dependencies = _Manifest?.Dependencies;
+                                    newMod.Name = newMod.Manifest?.Name ?? "";
+                                    newMod.Description = newMod.Manifest?.Description;
+                                    newMod.Website = newMod.Manifest?.Website_Url;
+                                    newMod.Dependencies = newMod.Manifest?.Dependencies;
 
                                     break;
                             }
                         }
                     }
                 }
+
+                return newMod;
             }
 
-            public override void FromModEntry(IModEntry modEntry)
+            static public IModEntry FromLocalPath(string localPath)
             {
-                Icon = new BitmapImage();
-                Icon.BeginInit();
-                Icon.UriSource = new Uri("pack://application:,,,/Resources/PackageNotFound.png");
-                Icon.DecodePixelWidth = 64;
-                Icon.DecodePixelHeight = 64;
-                Icon.CacheOption = BitmapCacheOption.OnLoad;
-                Icon.EndInit();
-                SourceName = modEntry.SourceName;
-                Name = modEntry.Name;
-                Author = modEntry.Author;
-                Description = modEntry.Description;
-                Versions = modEntry.Versions;
-                Website = modEntry.Website;
-                Dependencies = modEntry.Dependencies;
+                return FromUri(new Uri(localPath));
             }
 
-            public void FromPackageListing(PackageListing listing)
+            static public IModEntry FromModEntry(IModEntry modEntry)
             {
-                Icon = new BitmapImage();
-                Icon.BeginInit();
-                Icon.UriSource = new Uri(listing.versions[0].icon);
-                Icon.DecodePixelWidth = 64;
-                Icon.DecodePixelHeight = 64;
-                Icon.CacheOption = BitmapCacheOption.OnLoad;
-                Icon.EndInit();
-                Name = listing.name;
-                Author = listing.owner;
-                Description = listing.versions[0].description;
-                Website = listing.package_url;
-                Versions = [];
-                Dependencies = [];
+                Mod newMod = new();
 
-                foreach (PackageListingVersion entry in listing.versions)
+                newMod.GetIcon(new Uri("pack://application:,,,/Resources/PackageNotFound.png"));
+                newMod.SourceName = modEntry.SourceName;
+                newMod.Name = modEntry.Name;
+                newMod.Author = modEntry.Author;
+                newMod.Description = modEntry.Description;
+                newMod.Versions = modEntry.Versions;
+                newMod.Website = modEntry.Website;
+                newMod.Dependencies = modEntry.Dependencies;
+
+                return newMod;
+            }
+
+            static public IModEntry FromListing(Listing listing)
+            {
+                Mod newMod = new();
+                newMod.GetIcon(new Uri(listing.versions[0].icon));
+                newMod.Name = listing.name;
+                newMod.Author = listing.owner;
+                newMod.Description = listing.versions[0].description;
+                newMod.Website = listing.package_url;
+                newMod.Versions = [];
+                newMod.Dependencies = [];
+
+                foreach (ListingVersion entry in listing.versions)
                 {
-                    Versions.Add(entry.version_number, new Uri(entry.download_url));
+                    newMod.Versions.Add(entry.version_number, new Uri(entry.download_url));
 
                     foreach (string dep in entry.dependencies)
                     {
-                        if (!Dependencies.Contains(dep)) Dependencies.Append(dep);
+                        if (!newMod.Dependencies.Contains(dep)) newMod.Dependencies.Append(dep);
                     }
                 }
+
+                return newMod;
             }
         }
 
@@ -189,125 +182,134 @@ namespace LCModManager
         {
             static public string StorePath = AppConfig.PackageStores["Thunderstore"].LocalPath;
 
-            //Filename regex used primarily for AddPackage()
-            static private Regex WinDuplicateFileReg = new("\\([0-9]+\\)\\.[a-zA-Z0-9]+$", RegexOptions.Compiled);
-            static private Regex FileExtensionReg = new("\\.[a-zA-Z0-9]+$", RegexOptions.Compiled);
-            static private Regex PackageNameReg = new(".*-.+\\..+\\..+", RegexOptions.Compiled);
-            static private Regex PackageSourceFluffReg = new(WinDuplicateFileReg + "|" + FileExtensionReg, RegexOptions.Compiled);
-
-            static private Mod GetModFromPath(string localPath)
+            static private class RegexPatterns
             {
-                Mod mod = new();
-
-                mod.FromLocalPath(localPath);
-
-                mod.Author = Path.GetFileNameWithoutExtension(localPath).Split("-")[0];
-
-                return mod;
+                static public string WindowsDuplicateFilename = "\\([0-9]+\\)\\.[a-zA-Z0-9]+$";
+                static public string FilenameExtension = "\\.[a-zA-Z0-9]+$";
+                static public string WindowsFilenameFluff = WindowsDuplicateFilename + "|" + FilenameExtension;
+                static public string PackageName = ".*-.+\\..+\\..+";
             }
 
-            async static public Task<IModEntry?> AddMod(string sourcePath)
+            static private class RegExpressions
             {
-                string sourceFilename = sourcePath.Split("\\").Last(); //lop off path
+                static public Regex WindowsDuplicateFilename = new(RegexPatterns.WindowsDuplicateFilename, RegexOptions.Compiled);
+                static public Regex FilenameExtension = new(RegexPatterns.FilenameExtension, RegexOptions.Compiled);
+                static public Regex WindowsFilenameFluff = new(RegexPatterns.WindowsFilenameFluff, RegexOptions.Compiled);
+                static public Regex PackageName = new(RegexPatterns.PackageName, RegexOptions.Compiled);
+            }
 
-                string[] nameparts = sourceFilename[..^(PackageSourceFluffReg.Match(sourceFilename).Length)].Split("-"); //Lop off file extension and/or duplicate file patterns, then split string at each "-"
+            async static public Task AddMod(MemoryStream ms, string fullName)
+            {
+                if(!RegExpressions.PackageName.IsMatch(fullName)) return;
 
-                if (nameparts.Length != 3 || !PackageNameReg.IsMatch(sourceFilename)) return null; //return null if sourceName does not match desired format
+                string newFilename = StorePath + fullName + ".zip";
 
-                if (File.Exists(sourcePath))
+                using (FileStream file = File.Create(newFilename))
+                {
+                    ms.Position = 0;
+                    await ms.CopyToAsync(file);
+                }
+            }
+
+            async static public Task AddMod(string sourcePath)
+            {
+                string sourceFilename = sourcePath.Split("\\").Last(); //lop off parent path
+
+                string[] nameParts = sourceFilename[..^(RegExpressions.WindowsFilenameFluff.Match(sourceFilename).Length)].Split("-"); //Lop off file extension and/or duplicate file patterns, then split string at each "-"
+                string fullName = String.Join("-", nameParts);
+                string newFilename = StorePath + fullName + ".zip";
+
+                if (nameParts.Length != 3 || !RegExpressions.PackageName.IsMatch(sourceFilename)) return; //return if sourceFilename does not match desired format
+                else if (File.Exists(sourcePath))
                 {
                     try
                     {
-                        string newFilename = StorePath + String.Join("-", nameparts) + ".zip";
-
-                        if(!File.Exists(newFilename)) File.Copy(sourcePath, newFilename, true);
-
-                        return GetModFromPath(newFilename);
+                        await Task.Run(() =>
+                        {
+                            File.Copy(sourcePath, newFilename, true);
+                        });
                     }
                     catch (Exception ex)
                     {
                         Debug.Write(ex);
-                        return null;
                     }
                 }
-                else return null;
             }
 
-            static public List<IModEntry> GetMods()
+            async static public Task<List<IModEntry>> GetMods(Regex? regex = null)
             {
                 List<IModEntry> mods = [];
+                List<string> storeFiles;
 
-                foreach (string file in Directory.GetFiles(StorePath))
+                if(regex == null)
                 {
-                    string[] nameparts = Path.GetFileNameWithoutExtension(file).Split("-");
-                    Mod newMod = GetModFromPath(file);
+                    storeFiles = new(Directory.GetFiles(StorePath));
+                }
+                else
+                {
+                    storeFiles = new(Directory.GetFiles(StorePath).Where(path => regex.IsMatch(path)));
+                }
 
-                    if (mods.Find(m => m.Author == nameparts[0] && m.Name == nameparts[1]) is Mod existingMod)
+                foreach(string filePath in storeFiles)
+                {
+                    string[] nameparts = Path.GetFileNameWithoutExtension(filePath).Split("-");
+                    string author = nameparts[0];
+                    string name = nameparts[1];
+                    string version = nameparts[2];
+
+                    if (mods.Any(m => m.Name == name && m.Author == author)) continue;
+
+                    IModEntry mod = Mod.FromLocalPath(filePath);
+
+                    List<string> matches = storeFiles.FindAll(f =>
                     {
-                        existingMod.Versions.Add(nameparts[2], new Uri(file));
-                        existingMod.Dependencies = existingMod.Dependencies.Union(newMod.Dependencies).ToArray();
-                    }
-                    else
+                        string[] fParts = Path.GetFileNameWithoutExtension(f).Split("-");
+
+                        return fParts[0] == author && fParts[1] == name;
+                    });
+
+                    foreach (string match in matches)
                     {
-                        newMod.Versions.Add(nameparts[2], new Uri(file));
-                        mods.Add(newMod);
+                        string matchVersion = Path.GetFileNameWithoutExtension(match).Split("-")[2];
+
+                        mod.Versions[matchVersion] = new(match);
                     }
+
+                    mods.Add(mod);
                 }
 
                 return mods;
             }
 
-            static public List<IModEntry> GetMods(string name)
+            async static public Task<List<IModEntry>> GetMods(string filename)
             {
-                Regex regex = new Regex(name);
-                return GetMods(regex);
-            }
-
-            static public List<IModEntry> GetMods(Regex regex)
-            {
-                List<IModEntry> mods = [];
-
-                foreach (string file in Directory.GetFiles(StorePath).Where(path => regex.IsMatch(path)))
-                {
-                    string[] nameparts = Path.GetFileNameWithoutExtension(file).Split("-");
-                    Mod newMod = GetModFromPath(file);
-
-                    if (mods.Find(m => m.Author == nameparts[0] && m.Name == nameparts[1]) is Mod existingMod)
-                    {
-                        existingMod.Versions.Add(nameparts[2], new Uri(file));
-                        existingMod.Dependencies = existingMod.Dependencies.Union(newMod.Dependencies).ToArray();
-                    }
-                    else
-                    {
-                        newMod.Versions.Add(nameparts[2], new Uri(file));
-                        mods.Add(newMod);
-                    }
-                }
-
-                return mods;
+                Regex regex = new Regex(Path.GetFileName(filename));
+                return await GetMods(regex);
             }
 
             async static public Task RemoveMod(IModEntry mod)
             {
-                // for each package who's name matches package.Name
-                foreach (Mod m in GetMods().Where(p => p.Name == mod.Name && p.Author == mod.Author))
+                // if no versions are selected, or all versions are selected, delete every version
+                if (mod.SelectedVersions.Count == 0 || mod.SelectedVersions.Count == mod.Versions.Count)
                 {
-                    // if no versions are selected, or all versions are selected, delete every version
-                    if (mod.SelectedVersions.Count == 0 || mod.SelectedVersions.Count == mod.Versions.Count)
+                    foreach (KeyValuePair<string, Uri> v in mod.Versions)
                     {
-                        foreach (KeyValuePair<string, Uri> v in mod.Versions)
+                        await Task.Run(() =>
                         {
                             if (File.Exists(v.Value.LocalPath)) File.Delete(v.Value.LocalPath);
-                        }
+                        });
                     }
-                    else
+                }
+                else
+                {
+                    foreach (string version in mod.SelectedVersions)
                     {
-                        foreach (string version in mod.SelectedVersions)
-                        {
-                            string path = mod.Versions[version].LocalPath;
+                        string path = mod.Versions[version].LocalPath;
 
+                        await Task.Run(() =>
+                        {
                             if (File.Exists(path)) File.Delete(path);
-                        }
+                        });
                     }
                 }
             }
@@ -321,93 +323,89 @@ namespace LCModManager
         static internal class ModDeployer
         {
             //find Lethal Company game directory on system
-            static public string GameDir = GameDirectory.Find();
-            static public class RegularExpressions
+            static public string? GameDir = GameDirectory.Find();
+            static public string[] ExcludedFilenames = ["icon.png", "manifest.json", "README.md", "CHANGELOG.md", "LICENSE.MD", "LICENSE"];
+            static private Regex BepInExPackFSlashPattern = new("bepinexpack/", RegexOptions.IgnoreCase);
+            static private Dictionary<string, Regex> BepInExDirPatterns = new()
             {
-                static public Regex BepInEx = new("bepinex", RegexOptions.IgnoreCase);
-                static public Regex BepInExPack = new("bepinexpack", RegexOptions.IgnoreCase);
-                static public Regex plugins = new("plugins", RegexOptions.IgnoreCase);
-            }
+                {"BepInEx", new("bepinex", RegexOptions.IgnoreCase)},
+                {"BepInExPack", new("bepinexpack", RegexOptions.IgnoreCase)},
+                {"plugins", new("plugins", RegexOptions.IgnoreCase)},
+                {"core", new("core", RegexOptions.IgnoreCase)},
+                {"config",  new("config", RegexOptions.IgnoreCase)},
+                {"patchers", new("patchers", RegexOptions.IgnoreCase)}
+            };
 
-            static public string InferEntryParentDirectory(ZipArchiveEntry entry)
+            static public string InferEntryTarget(ZipArchiveEntry entry)
             {
+
+                string substring = entry.FullName[BepInExPackFSlashPattern.Match(entry.FullName).Length..];
                 string topDir;
 
-                if (entry.FullName.Contains("/"))
+                if (entry.Name == "doorstop_config.ini" || entry.Name == "winhttp.dll")
+                {
+                    return Path.GetFullPath(Path.Combine(GameDir, substring));
+                }
+
+                if (substring.Contains("/"))
                 {
                     topDir = entry.FullName.Split("/")[0];
                 }
-                else if (entry.FullName.Contains("\\"))
+                else if (substring.Contains("\\"))
                 {
                     topDir = entry.FullName.Split("\\")[0];
                 }
-                else if(entry.Name == "doorstop_config.ini" || entry.Name == "winhttp.dll")
+                else topDir = "";
+
+                //match top level dir name to known bepinex directory patterns
+                foreach(KeyValuePair<string, Regex> reg in BepInExDirPatterns)
                 {
-                    return GameDir;
-                }
-                else
-                {
-                    return GameDir + "BepInEx\\plugins";
+                    if(reg.Value.IsMatch(topDir))
+                    {
+                        topDir = reg.Key;
+                        break;
+                    }
                 }
 
-                if (RegularExpressions.BepInEx.IsMatch(topDir)) topDir = "BepInEx";
-                if (RegularExpressions.BepInExPack.IsMatch(topDir)) topDir = "BepInExPack";
-                if (RegularExpressions.plugins.IsMatch(topDir)) topDir = "plugins";
-
+                //infer target directory from matched top level directory
                 return topDir switch
                 {
-                    "BepInEx" => GameDir,
-                    "BepInExPack" => GameDir,
-                    "core" => GameDir + "BepInEx",
-                    "plugins" => GameDir + "BepInEx",
-                    "config" => GameDir + "BepInEx",
-                    "patchers" => GameDir + "BepInEx",
-                    _ => GameDir + "BepInEx\\plugins",
+                    "BepInEx" => Path.GetFullPath(Path.Combine(GameDir, substring)),
+                    "BepInExPack" => Path.GetFullPath(Path.Combine(GameDir, substring)),
+                    "plugins" => Path.GetFullPath(Path.Combine(GameDir, "BepInEx\\", substring)),
+                    "core" => Path.GetFullPath(Path.Combine(GameDir, "BepInEx\\", substring)),
+                    "config" => Path.GetFullPath(Path.Combine(GameDir, "BepInEx\\", substring)),
+                    "patchers" => Path.GetFullPath(Path.Combine(GameDir, "BepInEx\\", substring)),
+                    _ => Path.GetFullPath(Path.Combine(GameDir, "BepInEx\\plugins\\", substring)),
                 };
             }
 
             static public void DeployMod(IModEntry mod)
             {
                 string selectedVersionPath = mod.Versions[mod.SelectedVersions[0]].AbsolutePath;
-                string[] excludedFilenames = ["icon.png", "manifest.json", "README.md", "CHANGELOG.md"];
-                string bepinexpack = "BepInExPack/";
-                string destinationPath;
+                string targetLocation;
 
+                //open mod archive
                 using (ZipArchive zip = ZipFile.OpenRead(selectedVersionPath))
                 {
                     foreach (ZipArchiveEntry entry in zip.Entries)
                     {
-                        bool excluded = false;
-                        foreach (string name in excludedFilenames)
-                        {
-                            if (entry.Name.Contains(name))
-                            {
-                                excluded = true;
-                                break;
-                            }
-                        }
+                        //if filename is an exlcuded filename, skip entry
+                        if (ExcludedFilenames.Any(n => n == entry.Name) || entry.FullName == "BepInExPack/") continue;
 
-                        if (excluded) continue;
+                        //infer parent dir from archive structure
+                        targetLocation = InferEntryTarget(entry);
 
-                        string extractPath = InferEntryParentDirectory(entry);
-
-                        if (entry.FullName.Contains(bepinexpack) && entry.FullName.Count() >= bepinexpack.Count())
-                        {
-                            destinationPath = Path.Combine(extractPath, entry.FullName.Substring(bepinexpack.Count()));
-                        }
-                        else
-                        {
-                            destinationPath = Path.Combine(extractPath, entry.FullName);
-                        }
-
+                        //if given entry is a directory, create a directory at the targetLocation
                         if (entry.Name == "")
                         {
-                            Directory.CreateDirectory(destinationPath);
+                            Directory.CreateDirectory(targetLocation);
                         }
+                        //else ensure parent directory exists, and then extract the entry to the targetLocation
                         else
                         {
-                            Directory.CreateDirectory(Path.GetDirectoryName(destinationPath));
-                            entry.ExtractToFile(destinationPath, overwrite: true);
+                            Directory.CreateDirectory(Path.GetDirectoryName(targetLocation));
+                            entry.ExtractToFile(targetLocation, overwrite: true);
                         }
                     }
                 }
@@ -415,15 +413,47 @@ namespace LCModManager
 
             async static public Task DeployProfile(ModProfile profile)
             {
-                if(profile.ModList.Find(m => m.Name == "BepInExPack") is IModEntry modEntry)
-                {
-                    DeployMod(modEntry);
-                }
-                else return;
+                if(profile.ModList.Find(m => m.Name == "BepInExPack") is IModEntry modEntry) DeployMod(modEntry);
 
                 foreach (IModEntry mod in profile.ModList.FindAll(m => m.Name != "BepInExPack")) DeployMod(mod);
+            }
 
-                while (!File.Exists(GameDir + "\\" + "doorstop_config.ini")) await Task.Delay(100);
+            async static public Task<bool> StartGameWithProfile(ModProfile profile, int deployTimeout = 300)
+            {
+                if (GameDir != null)
+                {
+                    await CleanupGameDir();
+
+                    await DeployProfile(profile);
+
+                    while (!File.Exists(GameDir + "\\" + "doorstop_config.ini") && deployTimeout > 0)
+                    {
+                        await Task.Delay(1000);
+
+                        deployTimeout--;
+
+                        if (deployTimeout <= 0) return false;
+                    }
+
+                    try
+                    {
+                        ProcessStartInfo info = new(GameDir + "\\Lethal Company.exe");
+
+                        Process? process = Process.Start(info);
+
+                        await process.WaitForExitAsync();
+
+                        await CleanupGameDir();
+
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.Write(ex);
+                        return false;
+                    }
+                }
+                else return false;
             }
 
             async static public Task CleanupGameDir()
@@ -442,7 +472,7 @@ namespace LCModManager
                     }
                     catch (UnauthorizedAccessException e)
                     {
-                        continue;
+                        break;
                     }
 
                     Task.Delay(100);
@@ -458,7 +488,7 @@ namespace LCModManager
                         }
                         catch (UnauthorizedAccessException e)
                         {
-                            continue;
+                            break;
                         }
 
                         Task.Delay(100);
@@ -469,37 +499,12 @@ namespace LCModManager
 
         static internal class WebClient
         {
-            static public class Endpoints
-            {
-                static public string BaseURL = "https://thunderstore.io/c/lethal-company/api/v1";
-                static public string PackageList = BaseURL + "/package";
-            }
-
-            static public string PackageCachePath = AppConfig.PackageStore.LocalPath + "ThunderstoreCache.json";
-            static private HttpClient HTTPClient = new();
-
-
             //Cache singleton
-            public class PackageCache
+            private class Cache
             {
-                static private Dictionary<string, PackageListing> _Cache = new();
+                static private Dictionary<string, Listing> _Cache = new();
 
-                static public TimeSpan RefreshInterval = new TimeSpan(AppConfig.WebCacheRefreshInterval["Hours"],
-                                                                      AppConfig.WebCacheRefreshInterval["Minutes"],
-                                                                      AppConfig.WebCacheRefreshInterval["Seconds"]);
-
-                static public DateTime LastRefresh = new FileInfo(PackageCachePath).LastWriteTime;
-
-                static public bool NeedsRefresh
-                {
-                    get
-                    {
-                        if (File.Exists(PackageCachePath)) return ((DateTime.Now - LastRefresh) > RefreshInterval);
-                        else return true;
-                    }
-                }
-
-                static public Dictionary<string, PackageListing> Instance
+                static public Dictionary<string, Listing> Instance
                 {
                     get
                     {
@@ -510,24 +515,61 @@ namespace LCModManager
                     }
                 }
 
-                PackageCache() { }
+                Cache() { }
+            }
 
-                async static public Task LoadCache()
+            static public class Endpoints
+            {
+                static public string BaseURL = "https://thunderstore.io/c/lethal-company/api/v1";
+                static public string PackageList = BaseURL + "/package";
+            }
+
+            static public string CacheFilePath = AppConfig.PackageStore.LocalPath + "ThunderstoreCache.dat";
+
+            static private HttpClient HTTPClient = new();
+
+            static public TimeSpan RefreshInterval = new TimeSpan(AppConfig.WebCacheRefreshInterval["Hours"],
+                                                                  AppConfig.WebCacheRefreshInterval["Minutes"],
+                                                                  AppConfig.WebCacheRefreshInterval["Seconds"]);
+
+            static public DateTime? LastRefresh
+            {
+                get
                 {
-                    if (await GetPackageList() is List<PackageListing> list)
+                    try
                     {
-                        _Cache.Clear();
-                        foreach (PackageListing package in list) _Cache.Add(package.full_name, package);
-                        LastRefresh = DateTime.Now;
+                        if (File.Exists(CacheFilePath))
+                        {
+                            return new FileInfo(CacheFilePath).LastWriteTime;
+                        }
+                        else return null;
                     }
+                    catch { return null; }
                 }
             }
 
-            static public List<PackageListing> SearchPackageCache(Func<KeyValuePair<string, PackageListing>, bool> predicate)
+            static public bool NeedsRefresh
             {
-                List<PackageListing> list = new();
+                get
+                {
+                    return LastRefresh == null || (DateTime.Now - LastRefresh) > RefreshInterval;
+                }
+            }
 
-                foreach (KeyValuePair<string, PackageListing> listing in PackageCache.Instance.Where(predicate))
+            async static public Task LoadCache()
+            {
+                if (await GetCache() is List<Listing> list)
+                {
+                    Cache.Instance.Clear();
+                    foreach (Listing package in list) Cache.Instance.Add(package.full_name, package);
+                }
+            }
+
+            static public List<Listing> SearchCache(Func<KeyValuePair<string, Listing>, bool> predicate)
+            {
+                List<Listing> list = new();
+
+                foreach (KeyValuePair<string, Listing> listing in Cache.Instance.Where(predicate))
                 {
                     list.Add(listing.Value);
                 }
@@ -535,11 +577,47 @@ namespace LCModManager
                 return list;
             }
 
-            static public PackageListing? GetCachedPackage(string fullName)
+            static public Listing? GetCachedListing(string fullName)
             {
                 try
                 {
-                    return PackageCache.Instance[fullName];
+                    return Cache.Instance[fullName];
+                }
+                catch (Exception ex)
+                {
+                    Debug.Write(ex);
+                    return null;
+                }
+            }
+
+            async static public Task SetCache(MemoryStream ms)
+            {
+                try
+                {
+                    using (FileStream file = File.Create(CacheFilePath))
+                    {
+                        ms.Position = 0;
+                        await ms.CopyToAsync(file);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.Write(ex);
+                }
+            }
+
+            async static public Task<List<Listing>?> GetCache()
+            {
+                try
+                {
+                    Listing[] packages;
+
+                    using (FileStream file = File.OpenRead(CacheFilePath))
+                    {
+                        packages = JsonSerializer.Deserialize<Listing[]>(file);
+                    }
+
+                    return new List<Listing>(packages);
                 }
                 catch (Exception ex)
                 {
@@ -552,7 +630,9 @@ namespace LCModManager
             {
                 try
                 {
-                    return await HTTPClient.GetAsync(Endpoints.PackageList, HttpCompletionOption.ResponseHeadersRead); ;
+                    HttpRequestMessage request = new(HttpMethod.Get, Endpoints.PackageList);
+                    request.Headers.Add("Accept-Encoding", "gzip");
+                    return await HTTPClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
                 }
                 catch (Exception ex)
                 {
@@ -561,27 +641,7 @@ namespace LCModManager
                 }
             }
 
-            async static public Task<List<PackageListing>?> GetPackageList()
-            {
-                try
-                {
-                    PackageListing[] packages;
-
-                    using (FileStream file = File.OpenRead(PackageCachePath))
-                    {
-                        packages = JsonSerializer.Deserialize<PackageListing[]>(file);
-                    }
-
-                    return new List<PackageListing>(packages);
-                }
-                catch (Exception ex)
-                {
-                    Debug.Write(ex);
-                    return null;
-                }
-            }
-
-            async static public Task<HttpResponseMessage?> DownloadPackageHeaders(PackageListingVersion versionEntry)
+            async static public Task<HttpResponseMessage?> DownloadPackageHeaders(ListingVersion versionEntry)
             {
                 try
                 {

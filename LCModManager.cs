@@ -3,8 +3,11 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.IO.Compression;
 using System.Net.Http;
+using System.Reflection.PortableExecutable;
 using System.Runtime.CompilerServices;
+using System.Windows.Controls;
 using System.Windows.Data;
 
 namespace LCModManager
@@ -75,8 +78,16 @@ namespace LCModManager
         static public Uri Resources = new(Environment.GetEnvironmentVariable("LOCALAPPDATA") + "\\LCModManager\\");
         static public Uri PackageStore = new(Resources, "mods\\");
         static public Uri ProfileStore = new(Resources, "profiles\\");
-        static public Dictionary<string, Uri> PackageStores = new();
-        static public Dictionary<string, int> WebCacheRefreshInterval = new();
+        static public Dictionary<string, Uri> PackageStores = new()
+        {
+            {"Thunderstore", new Uri(PackageStore, "Thunderstore\\")}
+        };
+        static public Dictionary<string, int> WebCacheRefreshInterval = new()
+        {
+            {"Hours", 12 },
+            {"Minutes", 0 },
+            {"Seconds", 0}
+        };
 
         static AppConfig()
         {
@@ -84,16 +95,10 @@ namespace LCModManager
             if (!Directory.Exists(PackageStore.LocalPath)) Directory.CreateDirectory(PackageStore.LocalPath);
             if (!Directory.Exists(ProfileStore.LocalPath)) Directory.CreateDirectory(ProfileStore.LocalPath);
 
-            PackageStores.Add("Thunderstore", new Uri(PackageStore, "Thunderstore\\"));
-
             foreach (KeyValuePair<string, Uri> pair in PackageStores)
             {
                 if (!Directory.Exists(pair.Value.LocalPath)) Directory.CreateDirectory(pair.Value.LocalPath);
             }
-
-            WebCacheRefreshInterval["Hours"] = 12;
-            WebCacheRefreshInterval["Minutes"] = 0;
-            WebCacheRefreshInterval["Seconds"] = 0;
         }
     }
 
@@ -163,30 +168,22 @@ namespace LCModManager
         public bool? ProgressBarEnabled;
         public int? ProgressBarPosition;
 
-        public StatusUpdatedEventArgs(AppState currentState)
-        {
-            CurrentState = currentState;
-        }
-
-        public StatusUpdatedEventArgs(AppState currentState, string message)
-        {
-            CurrentState = currentState;
-            Message = message;
-        }
-
-        public StatusUpdatedEventArgs(AppState currentState, string message, bool progressEnabled)
-        {
-            CurrentState = currentState;
-            Message = message;
-            ProgressBarEnabled = progressEnabled;
-        }
-
-        public StatusUpdatedEventArgs(AppState currentState, string message, bool progressEnabled, int progressPosition)
+        public StatusUpdatedEventArgs(AppState? currentState, string? message, bool? progressEnabled, int? progressPosition)
         {
             CurrentState = currentState;
             Message = message;
             ProgressBarEnabled = progressEnabled;
             ProgressBarPosition = progressPosition;
+        }
+    }
+
+    public class Page : System.Windows.Controls.Page
+    {
+        public static event EventHandler<StatusUpdatedEventArgs> StatusUpdated;
+
+        async static public void OnStatusUpdated(AppState currentState, string message, bool? progressEnabled = null, int? progressPosition = null, object sender = null)
+        {
+            StatusUpdated?.Invoke(sender, new StatusUpdatedEventArgs(currentState, message, progressEnabled, progressPosition));
         }
     }
 
@@ -207,7 +204,6 @@ namespace LCModManager
             set
             {
                 _CurrentState = value;
-                ResetInactivityTimer();
                 OnPropertyChanged();
             }
         }
@@ -218,7 +214,6 @@ namespace LCModManager
             set
             {
                 _Message = value;
-                ResetInactivityTimer();
                 OnPropertyChanged();
             }
         }
@@ -229,7 +224,6 @@ namespace LCModManager
             set
             {
                 _ProgressBarEnabled = value;
-                ResetInactivityTimer();
                 OnPropertyChanged();
             }
         }
@@ -239,7 +233,6 @@ namespace LCModManager
             set
             {
                 _ProgressBarPosition = value;
-                ResetInactivityTimer();
                 OnPropertyChanged();
             }
         }
@@ -267,7 +260,7 @@ namespace LCModManager
             ProgressBarPosition = 0;
         }
 
-        private void ResetInactivityTimer()
+        public void ResetInactivityTimer()
         {
             _InactivityTimer.Interval = _InactivityTimeout;
             _InactivityTimer.Start();
@@ -279,92 +272,119 @@ namespace LCModManager
         }
     }
 
-    public partial class Page : System.Windows.Controls.Page
+    public class Downloader : INotifyPropertyChanged
     {
-        static public event EventHandler<StatusUpdatedEventArgs> StatusUpdated;
+        private string _Name;
+        private float _ProgressPercent;
+        private IProgress<float> _Progress;
+        private HttpResponseMessage _Headers;
 
-        protected void OnStatusUpdated(StatusUpdatedEventArgs e)
+        public string Name
         {
-            StatusUpdated?.Invoke(this, e);
+            get { return _Name; }
+            set { _Name = value; }
         }
-
-        async protected Task<string?> DownloadModPackage(string dependencyString, bool useExistingDownloads = true)
+        public float ProgressPercent
         {
-            string[] depParts = dependencyString.Split("-");
-
-            PackageListing? query = WebClient.GetCachedPackage(depParts[^3] + "-" + depParts[^2]);
-
-            if (query != null)
+            get
             {
-                PackageListingVersion versionEntry = query.Value.versions.First(v => v.version_number == depParts[^1]);
-
-                if (await DownloadModPackage(versionEntry, useExistingDownloads) is string downloadLocation)
-                {
-                    return downloadLocation;
-                }
-                else return null;
+                return _ProgressPercent;
             }
-            else return null;
-        }
 
-        async protected Task<string?> DownloadModPackage(PackageListingVersion version, bool useExistingDownloads = true)
-        {
-            string destinationPath = new Uri(AppConfig.PackageStores["Thunderstore"], version.full_name + ".zip").LocalPath;
-
-            if (useExistingDownloads && File.Exists(destinationPath)) return destinationPath;
-            else if (File.Exists(destinationPath)) File.Delete(destinationPath);
-
-            using (HttpResponseMessage? response = await WebClient.DownloadPackageHeaders(version))
+            set
             {
-                if (response != null)
-                {
-                    await DownloadFromResponseHeaders(response, destinationPath, AppState.DownloadingMod);
-
-                    return destinationPath;
-                }
-                else return null;
+                _ProgressPercent = value;
+                OnPropertyChanged();
+            }
+        }
+        public bool IsDownloaded
+        {
+            get
+            {
+                return ProgressPercent >= 100;
             }
         }
 
-        async protected Task DownloadFromResponseHeaders(HttpResponseMessage response, string destinationPath, AppState state, int bufferSize = 81920, CancellationToken cancellationToken = new CancellationToken())
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        public Downloader(HttpResponseMessage headers)
         {
-            OnStatusUpdated(new StatusUpdatedEventArgs(state, "", true, 0));
+            _Name = "";
+            _ProgressPercent = 0;
+            _Progress = new Progress<float>(p => ProgressPercent = p);
+            _Headers = headers;
+        }
 
-            if (File.Exists(destinationPath)) File.Delete(destinationPath);
+        public Downloader(HttpResponseMessage headers, IProgress<float> progress)
+        {
+            _Name = "";
+            _ProgressPercent = 0;
+            _Progress = progress;
+            _Headers = headers;
+        }
 
-            using Stream source = await response.Content.ReadAsStreamAsync();
-            using Stream destination = File.OpenWrite(destinationPath);
-            using (response)
+        public Downloader(string name, HttpResponseMessage headers)
+        {
+            _Name = name;
+            _ProgressPercent = 0;
+            _Progress = new Progress<float>(p => ProgressPercent = p);
+            _Headers = headers;
+        }
+
+        public Downloader(string name, HttpResponseMessage headers, IProgress<float> progress)
+        {
+            _Name = name;
+            _ProgressPercent = 0;
+            _Progress = progress;
+            _Headers = headers;
+        }
+
+        protected void OnPropertyChanged([CallerMemberName] string name = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+
+        async public Task<MemoryStream> Download(int bufferSize = 81920, CancellationToken cancellationToken = new CancellationToken())
+        {
+            //set locals
+            Stream source;
+            MemoryStream result = new();
+            long? contentLength = _Headers.Content.Headers.ContentLength;
+            byte[] buffer = new byte[bufferSize];
+            long totalBytesRead = 0;
+            int bytesRead;
+
+            //set source to GZipStream in decompression mode if response header Content-Encoding contains "gzip"
+            if (_Headers.Content.Headers.ContentEncoding.Contains("gzip"))
             {
-                long? contentLength = response.Content.Headers.ContentLength;
+                source = new GZipStream(await _Headers.Content.ReadAsStreamAsync(), CompressionMode.Decompress);
+            }
+            else
+            {
+                source = await _Headers.Content.ReadAsStreamAsync();
+            }
 
-                if (!contentLength.HasValue)
+            //dispose of response and source stream once read operation is complete.
+            using (_Headers)
+            using (source)
+            {
+                //read bytes from source stream
+                while ((bytesRead = await source.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false)) != 0)
                 {
-                    await source.CopyToAsync(destination);
-                    OnStatusUpdated(new StatusUpdatedEventArgs(AppState.Idle, "", false));
-                }
-                else
-                {
-                    byte[] buffer = new byte[bufferSize];
-                    long totalBytesRead = 0;
-                    int bytesRead;
+                    //write bytes to result stream
+                    await result.WriteAsync(buffer, 0, bytesRead, cancellationToken).ConfigureAwait(false);
 
-                    while ((bytesRead = await source.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false)) != 0)
+                    //increment totalBytesRead with the amount of bytes that were read
+                    totalBytesRead += bytesRead;
+
+                    //update progress if response contains Content-Length header.
+                    if (contentLength.HasValue)
                     {
-                        await destination.WriteAsync(buffer, 0, bytesRead, cancellationToken).ConfigureAwait(false);
-                        
-                        totalBytesRead += bytesRead;
-
-                        OnStatusUpdated(
-                            new StatusUpdatedEventArgs(
-                                state, 
-                                "Downloading '" + response.RequestMessage.RequestUri + "'...", 
-                                true, 
-                                (int)(((float)totalBytesRead / contentLength.Value) * 100)
-                            )
-                        );
+                        _Progress.Report(((float)totalBytesRead / contentLength.Value) * 100);
                     }
                 }
+
+                return result;
             }
         }
     }

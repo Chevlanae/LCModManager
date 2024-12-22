@@ -11,7 +11,7 @@ namespace LCModManager
     /// </summary>
     public partial class AddModsDialog : Window
     {
-        public ObservableCollection<IModEntry> ModList;
+        public ObservableCollection<IModEntry> ModList = [];
 
         public AddModsDialog()
         {
@@ -22,17 +22,19 @@ namespace LCModManager
 
         public AddModsDialog(IList<IModEntry> existingEntries)
         {
-            InitializeComponent();
-
             ModList = [];
+            InitializeComponent();
+            ModListControl.ItemsSource = ModList;
+            RefreshModList(existingEntries);
+        }
 
-            foreach (IModEntry mod in PackageManager.GetMods())
+        async private void RefreshModList(IList<IModEntry> existingEntries)
+        {
+            foreach (IModEntry mod in await PackageManager.GetMods())
             {
                 if (existingEntries.Any(e => e.Name == mod.Name && e.Author == mod.Author)) continue;
                 else ModList.Add(mod);
             }
-
-            ModListControl.ItemsSource = ModList;
         }
 
         private void OKButton_Click(object sender, RoutedEventArgs e)

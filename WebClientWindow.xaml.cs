@@ -14,7 +14,7 @@ namespace LCModManager
     /// </summary>
     public partial class WebClientWindow : Window
     {
-        public Dictionary<string, PackageListing> QueriedPackages = new();
+        public Dictionary<string, Listing> QueriedPackages = new();
         public ObservableCollection<IModEntry> ModList = [];
 
         public WebClientWindow()
@@ -32,11 +32,9 @@ namespace LCModManager
 
             Regex reg = new(Regex.Escape(QueryTextBox.Text), RegexOptions.IgnoreCase);
 
-            foreach (PackageListing listing in WebClient.SearchPackageCache(k => reg.IsMatch(k.Value.name)))
+            foreach (Listing listing in WebClient.SearchCache(k => reg.IsMatch(k.Value.name)))
             {
-                Mod mod = new Mod();
-                mod.FromPackageListing(listing);
-                ModList.Add(mod);
+                ModList.Add(Mod.FromListing(listing));
             }
 
             ItemCountTextBlock.Text = "Returned " + ModList.Count.ToString() + " Results";

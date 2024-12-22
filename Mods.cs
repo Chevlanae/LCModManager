@@ -28,14 +28,17 @@ namespace LCModManager
         public bool HasMismatchedDependencies { get; }
         public bool HasIncompatibility { get; }
 
-        public void FromLocalPath(string localPath);
+        static public IModEntry FromLocalPath(string localPath) => throw new NotImplementedException();
+        static public IModEntry FromUri(Uri uri) => throw new NotImplementedException();
+        static public IModEntry FromModEntry(IModEntry modEntry) => throw new NotImplementedException();
+
         public void GetIcon(Uri uri);
         public void GetIcon(Stream stream);
         public void ProcessDependencies(List<IModEntry> modlist);
     }
 
     [DataContract]
-    public abstract class ModPackage : IModEntry
+    public partial class ModPackage : IModEntry
     {
         public BitmapImage? Icon { get; set; }
 
@@ -62,11 +65,7 @@ namespace LCModManager
         {
             get
             {
-                if (SelectedVersions.All(v => Versions.Keys.Contains(v)))
-                {
-                    return SelectedVersions.All(v => AppConfig.PackageStore.IsBaseOf(Versions[v]) && File.Exists(Versions[v].LocalPath));
-                }
-                else return false;
+                return SelectedVersions.All(v => Versions.Keys.Contains(v) && AppConfig.PackageStore.IsBaseOf(Versions[v]) && File.Exists(Versions[v].LocalPath));
             }
         }
 
@@ -74,7 +73,7 @@ namespace LCModManager
         {
             get
             {
-                return Versions.Any(v => AppConfig.PackageStore.IsBaseOf(v.Value) && File.Exists(v.Value.AbsolutePath));
+                return Versions.Any(v => AppConfig.PackageStore.IsBaseOf(v.Value) && File.Exists(v.Value.LocalPath));
             }
         }
 
@@ -102,41 +101,32 @@ namespace LCModManager
             }
         }
 
-        public abstract void FromUri(Uri uri);
-        public abstract void FromModEntry(IModEntry modEntry);
-        public void FromLocalPath(string localPath)
-        {
-            FromUri(new Uri(localPath));
-        }
-
         public void GetIcon(Uri uri)
         {
-            if (uri.IsFile)
-            {
-                Icon = new BitmapImage();
-                Icon.BeginInit();
-                Icon.UriSource = uri;
-                Icon.DecodePixelWidth = 64;
-                Icon.DecodePixelHeight = 64;
-                Icon.CacheOption = BitmapCacheOption.OnLoad;
-                Icon.Freeze();
-                Icon.EndInit();
-            }
-
+            Icon = new BitmapImage();
+            Icon.BeginInit();
+            Icon.UriSource = uri;
+            Icon.DecodePixelWidth = 64;
+            Icon.DecodePixelHeight = 64;
+            Icon.CacheOption = BitmapCacheOption.OnLoad;
+            Icon.EndInit();
         }
 
-        public void GetIcon(Stream stream)
+        public void GetIcon(Stream sourceStream)
         {
-            using (stream)
+            using (sourceStream)
+            using (MemoryStream ms = new())
             {
+                sourceStream.CopyTo(ms);
+                ms.Position = 0;
                 Icon = new BitmapImage();
                 Icon.BeginInit();
-                Icon.StreamSource = stream;
+                Icon.StreamSource = ms;
                 Icon.DecodePixelWidth = 64;
                 Icon.DecodePixelHeight = 64;
                 Icon.CacheOption = BitmapCacheOption.OnLoad;
-                Icon.Freeze();
                 Icon.EndInit();
+                Icon.Freeze();
             }
         }
 
@@ -149,10 +139,10 @@ namespace LCModManager
 
                 foreach (string depStr in Dependencies)
                 {
-                    string[] depStrParts = depStr.Split('-');
-                    string owner = depStrParts[^3];
-                    string name = depStrParts[^2];
-                    string version = depStrParts[^1];
+                    string[] depSplit = depStr.Split('-');
+                    string owner = depSplit[0];
+                    string name = depSplit[1];
+                    string version = depSplit[2];
 
                     List<IModEntry> foundDependencies = modlist.FindAll(e => e.Name == name && e.Author == owner);
 
@@ -176,23 +166,21 @@ namespace LCModManager
                             break;
 
                         default:
-                            bool match = false;
                             foreach (IModEntry item in foundDependencies)
                             {
                                 if (item.Versions.ContainsKey(version))
                                 {
-                                    match = true;
+                                    mismatchedDeps.Add(depStr);
                                     break;
                                 }
 
                             }
-                            if (!match) mismatchedDeps.Add(depStr);
                             break;
                     }
                 }
 
-                MismatchedDependencies = [.. mismatchedDeps];
                 MissingDependencies = [.. missingDeps];
+                MismatchedDependencies = [.. mismatchedDeps];
             }
         }
     }
